@@ -146,10 +146,6 @@ export default function Home() {
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                         <div className="text-left max-w-2xl">
-                            <div className="inline-flex items-center gap-2 bg-green/10 border border-green/20 rounded-full px-4 py-1.5 mb-6">
-                                <Sparkles className="w-4 h-4 text-green" />
-                                <span className="text-green text-sm font-medium">O Marketplace #1 de Limpeza</span>
-                            </div>
                             <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.1] mb-6 tracking-tight">
                                 Encontre os <br className="hidden md:block" />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#39FF14] via-green to-emerald-400">
@@ -197,37 +193,17 @@ export default function Home() {
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
                             <div className="relative z-10 w-full aspect-square max-w-[500px] ml-auto">
-                                <div className="absolute inset-0 bg-green/20 rounded-3xl rotate-6 scale-95 blur-2xl"></div>
-                                <div className="absolute inset-0 bg-navy-light/40 backdrop-blur-sm border border-white/10 rounded-3xl -rotate-3 overflow-hidden shadow-2xl">
+                                <div className="absolute inset-0 bg-green/20 rounded-3xl blur-2xl"></div>
+                                <div className="absolute inset-0 bg-navy-light/40 backdrop-blur-sm border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
                                     <img
                                         src="/assets/professional.png"
-                                        alt="Profissional LimpFlix"
+                                        alt="Boas-vindas LimpFlix"
                                         className="w-full h-full object-contain object-bottom"
                                         onError={(e) => {
                                             e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=800"
                                             e.target.className = "w-full h-full object-cover opacity-50 contrast-125"
                                         }}
                                     />
-                                </div>
-                                {/* Floating Badges */}
-                                <div className="absolute top-10 -left-10 bg-white p-4 rounded-2xl shadow-2xl animate-bounce duration-[3000ms]">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center">
-                                            <CheckCircle2 className="w-6 h-6 text-green" />
-                                        </div>
-                                        <div>
-                                            <p className="text-navy font-bold text-sm leading-none">Verificado</p>
-                                            <p className="text-gray-500 text-[10px] mt-1">Identidade Confirmada</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="absolute bottom-10 -right-5 bg-white p-4 rounded-2xl shadow-2xl animate-pulse">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex gap-1">
-                                            {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-3 h-3 text-yellow-400 fill-yellow-400" />)}
-                                        </div>
-                                        <p className="text-navy font-bold text-sm">4.9/5</p>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -266,9 +242,6 @@ export default function Home() {
 
                                 {/* Content */}
                                 <div className="relative z-10">
-                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${service.color} flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform`}>
-                                        <service.icon className="w-5 h-5 text-white" />
-                                    </div>
                                     <h3 className="font-bold text-white text-lg group-hover:text-green transition-colors leading-tight">
                                         {service.name}
                                     </h3>

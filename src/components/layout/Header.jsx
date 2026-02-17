@@ -19,20 +19,16 @@ export default function Header() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo */}
-                    <Link to="/" className="flex items-center gap-2 group relative">
-                        <div className="relative">
-                            <div className="w-10 h-10 bg-green rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-[0_0_15px_rgba(34,197,94,0.4)] group-hover:scale-105 transition-transform duration-300">
+                    <Link to="/" className="flex items-center gap-1 group relative">
+                        <div className="relative flex items-center">
+                            <span className="text-3xl font-bold text-white tracking-tighter">
                                 L
-                            </div>
-                            <Sparkles className="absolute -top-2 -right-2 w-5 h-5 text-[#39FF14] animate-twinkle drop-shadow-[0_0_5px_#39FF14]" />
-                            <Sparkles className="absolute -bottom-1 -left-2 w-3 h-3 text-[#39FF14] animate-twinkle-slow delay-75 drop-shadow-[0_0_3px_#39FF14]" />
+                            </span>
+                            <Sparkles className="w-4 h-4 text-[#39FF14] drop-shadow-[0_0_5px_#39FF14] ml-0.5" />
                         </div>
-                        <div className="flex flex-col -gap-1">
+                        <div className="flex flex-col">
                             <span className="text-2xl font-black text-white tracking-tighter leading-none">
                                 Limp<span className="text-green">Flix</span>
-                            </span>
-                            <span className="text-[10px] text-green font-bold tracking-[0.2em] uppercase ml-0.5">
-                                Brilho Real
                             </span>
                         </div>
                     </Link>
