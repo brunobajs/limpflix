@@ -62,7 +62,53 @@ export default function ProviderDashboard() {
         }
 
         loadProviderData()
-    }, [user, searchParams])
+
+        // Real-time listener for new service requests/bookings
+        const channel = supabase
+            .channel('provider-notifications')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'service_bookings',
+                    filter: `provider_id=eq.${provider?.id}`
+                },
+                () => {
+                    playNotificationSound()
+                    loadProviderData()
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [user, searchParams, provider?.id])
+
+    function playNotificationSound() {
+        try {
+            // Simple Base64 "ping" sound
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+            const osc = audioCtx.createOscillator()
+            const gain = audioCtx.createGain()
+
+            osc.type = 'sine'
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime) // A5
+            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5)
+
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime)
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5)
+
+            osc.connect(gain)
+            gain.connect(audioCtx.destination)
+
+            osc.start()
+            osc.stop(audioCtx.currentTime + 0.5)
+        } catch (e) {
+            console.error('Audio alert failed:', e)
+        }
+    }
 
     async function loadProviderData() {
         try {
