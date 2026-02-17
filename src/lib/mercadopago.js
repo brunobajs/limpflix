@@ -6,8 +6,9 @@
 const MP_ACCESS_TOKEN = import.meta.env.VITE_MP_ACCESS_TOKEN; // Usar com cautela no front-end
 const MP_PUBLIC_KEY = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY;
 
-export async function createPaymentPreference({ clientEmail, serviceName, amount }) {
-    const platformFee = Math.round(amount * 0.06 * 100) / 100; // 6% de comissão
+export async function createPaymentPreference({ clientEmail, serviceName, amount, metadata }) {
+    // Serializar metadata para passar na URL de sucesso
+    const queryParams = new URLSearchParams(metadata).toString();
 
     const preference = {
         items: [
@@ -21,11 +22,12 @@ export async function createPaymentPreference({ clientEmail, serviceName, amount
         payer: {
             email: clientEmail
         },
-        // O valor integral cai na sua conta. A taxa aqui é apenas informativa para o MP.
-        marketplace_fee: platformFee,
+        external_reference: metadata.quote_id || '',
+        // Removido marketplace_fee pois o repasse é feito via API de Pix (Caminho 2)
+        // Isso garante que a plataforma receba 100% para realizar o split manual imediato.
 
         back_urls: {
-            success: `${window.location.origin}/pagamento/sucesso`,
+            success: `${window.location.origin}/pagamento/sucesso?${queryParams}`,
             failure: `${window.location.origin}/pagamento/erro`,
             pending: `${window.location.origin}/pagamento/pendente`
         },

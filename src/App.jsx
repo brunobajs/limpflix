@@ -13,6 +13,7 @@ import RequestQuote from './pages/RequestQuote'
 import ClientDashboard from './pages/ClientDashboard'
 import PaymentPage from './pages/PaymentPage'
 import PaymentSuccess from './pages/PaymentSuccess'
+import AdminDashboard from './pages/AdminDashboard'
 import { useEffect } from 'react'
 
 // ScrollToTop component
@@ -55,6 +56,7 @@ function App() {
                     <Route path="/pagamento/sucesso" element={<PaymentSuccess />} />
                     <Route path="/cliente/dashboard" element={<ClientDashboard />} />
                     <Route path="/dashboard" element={<ProviderDashboard />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
 
                     {/* Fallback 404 */}
                     <Route path="*" element={

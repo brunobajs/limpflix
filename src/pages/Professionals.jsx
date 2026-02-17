@@ -1,11 +1,23 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { getCurrentPosition, sortByDistance } from '../lib/geo'
 import {
     Search, MapPin, Star, Filter, ArrowUpDown,
-    Phone, User, Loader2, Navigation, ChevronRight
+    Phone, User, Loader2, Navigation, ChevronRight, Map as MapIcon, List
 } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix for Leaflet marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 const SERVICE_OPTIONS = [
     'Limpeza de Sofá', 'Limpeza de Colchão', 'Limpeza de Carpete',
@@ -16,6 +28,7 @@ const SERVICE_OPTIONS = [
 
 export default function Professionals() {
     const [searchParams] = useSearchParams()
+    const { profile } = useAuth()
     const [providers, setProviders] = useState([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -25,26 +38,50 @@ export default function Professionals() {
     const [userLocation, setUserLocation] = useState(null)
     const [geoLoading, setGeoLoading] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
+    const [viewMode, setViewMode] = useState('list')
 
     useEffect(() => {
+        const refCode = searchParams.get('ref')
+        if (refCode && profile && !profile.referred_by_provider_id) {
+            handleCaptureReferral(refCode)
+        }
         loadProviders()
-    }, [])
+    }, [profile, searchParams])
+
+    async function handleCaptureReferral(code) {
+        try {
+            await supabase.rpc('link_client_to_referrer', {
+                client_id: profile.id,
+                referral_code: code
+            })
+        } catch (err) {
+            console.error('Error linking referral:', err)
+        }
+    }
 
     async function loadProviders() {
         setLoading(true)
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('service_providers')
                 .select('*')
                 .eq('status', 'approved')
-                .order('rating', { ascending: false })
+
+            // Exclusivity Logic: If client was referred by a provider, only show that provider
+            if (profile?.referred_by_provider_id) {
+                query = query.eq('id', profile.referred_by_provider_id)
+            }
+
+            const { data, error } = await query.order('rating', { ascending: false })
 
             if (error) throw error
             setProviders(data || [])
         } catch (err) {
             console.error('Error loading providers:', err)
             // Use demo data if Supabase is not configured
-            setProviders(getDemoProviders())
+            if (!profile?.referred_by_provider_id) {
+                setProviders(getDemoProviders())
+            }
         } finally {
             setLoading(false)
         }
@@ -65,13 +102,22 @@ export default function Professionals() {
 
     // Filter and sort
     let filtered = providers.filter(p => {
+        const pCity = p.city || ''
+        const pTrade = p.trade_name || ''
+        const pResp = p.responsible_name || ''
+        const pServices = p.services_offered || []
+
         const matchSearch = !search ||
-            p.trade_name?.toLowerCase().includes(search.toLowerCase()) ||
-            p.responsible_name?.toLowerCase().includes(search.toLowerCase())
+            pTrade.toLowerCase().includes(search.toLowerCase()) ||
+            pResp.toLowerCase().includes(search.toLowerCase())
+
         const matchCity = !cityFilter ||
-            p.city?.toLowerCase().includes(cityFilter.toLowerCase())
+            pCity.toLowerCase() === cityFilter.toLowerCase() ||
+            pCity.toLowerCase().includes(cityFilter.toLowerCase())
+
         const matchService = !serviceFilter ||
-            p.services_offered?.some(s => s.toLowerCase().includes(serviceFilter.toLowerCase()))
+            pServices.some(s => s.toLowerCase().includes(serviceFilter.toLowerCase()))
+
         return matchSearch && matchCity && matchService
     })
 
@@ -90,13 +136,31 @@ export default function Professionals() {
             {/* Header */}
             <section className="bg-gradient-to-br from-navy to-navy-light py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center mb-8">
-                        <h1 className="text-3xl md:text-5xl font-bold text-white mb-3">
-                            Profissionais de Limpeza
-                        </h1>
-                        <p className="text-white/70 text-lg">
-                            Encontre os melhores profissionais verificados da sua região
-                        </p>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div>
+                            <h1 className="text-3xl md:text-5xl font-bold text-white mb-3">
+                                Profissionais de Limpeza
+                            </h1>
+                            <p className="text-white/70 text-lg">
+                                Encontre os melhores profissionais verificados da sua região
+                            </p>
+                        </div>
+                        <div className="flex bg-white/10 p-1 rounded-xl border border-white/20 whitespace-nowrap">
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${viewMode === 'list' ? 'bg-green text-white shadow-lg' : 'text-white/70 hover:text-white'}`}
+                            >
+                                <List className="w-4 h-4" />
+                                Lista
+                            </button>
+                            <button
+                                onClick={() => setViewMode('map')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${viewMode === 'map' ? 'bg-green text-white shadow-lg' : 'text-white/70 hover:text-white'}`}
+                            >
+                                <MapIcon className="w-4 h-4" />
+                                Mapa
+                            </button>
+                        </div>
                     </div>
 
                     {/* Search bar */}
@@ -189,16 +253,65 @@ export default function Professionals() {
                         <h3 className="text-xl font-bold text-gray-700 mb-2">Nenhum profissional encontrado</h3>
                         <p className="text-gray-500">Tente ajustar os filtros ou buscar por outra região.</p>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                ) : viewMode === 'list' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
                         {filtered.map((provider) => (
                             <ProviderCard key={provider.id} provider={provider} />
                         ))}
+                    </div>
+                ) : (
+                    <div className="h-[600px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm animate-fade-in z-0 sticky top-20">
+                        <MapContainer
+                            center={userLocation ? [userLocation.latitude, userLocation.longitude] : [-23.5505, -46.6333]}
+                            zoom={11}
+                            style={{ height: '100%', width: '100%' }}
+                        >
+                            <TileLayer
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            />
+                            {userLocation && (
+                                <Marker position={[userLocation.latitude, userLocation.longitude]}>
+                                    <Popup>Você está aqui</Popup>
+                                </Marker>
+                            )}
+                            {filtered.map(p => p.latitude && p.longitude && (
+                                <Marker key={p.id} position={[p.latitude, p.longitude]}>
+                                    <Popup>
+                                        <div className="p-1 min-w-[150px]">
+                                            <h4 className="font-bold text-navy mb-1">{p.trade_name || p.responsible_name}</h4>
+                                            <p className="text-xs text-gray-500 mb-2">{p.city}, {p.state}</p>
+                                            <div className="flex items-center gap-1 mb-2">
+                                                <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                                <span className="text-xs font-bold">{p.rating || '5.0'}</span>
+                                            </div>
+                                            <Link
+                                                to={`/profissional/${p.id}`}
+                                                className="block text-center bg-green text-white text-[10px] font-bold py-1.5 rounded-lg hover:bg-green-dark transition-colors"
+                                            >
+                                                Ver Perfil
+                                            </Link>
+                                        </div>
+                                    </Popup>
+                                </Marker>
+                            ))}
+                            <MapUpdater center={userLocation ? [userLocation.latitude, userLocation.longitude] : null} />
+                        </MapContainer>
                     </div>
                 )}
             </section>
         </div>
     )
+}
+
+function MapUpdater({ center }) {
+    const map = useMap()
+    useEffect(() => {
+        if (center) {
+            map.flyTo(center, 13)
+        }
+    }, [center, map])
+    return null
 }
 
 function ProviderCard({ provider }) {

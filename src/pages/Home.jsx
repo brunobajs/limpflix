@@ -7,17 +7,83 @@ import {
 } from 'lucide-react'
 
 const SERVICES = [
-    { name: 'Limpeza de Sofá', slug: 'limpeza-sofa', icon: Sofa, color: 'from-blue-500 to-blue-600' },
-    { name: 'Limpeza de Colchão', slug: 'limpeza-colchao', icon: BedDouble, color: 'from-purple-500 to-purple-600' },
-    { name: 'Limpeza de Carpete', slug: 'limpeza-carpete', icon: Brush, color: 'from-orange-500 to-orange-600' },
-    { name: 'Limpeza de Cortinas', slug: 'limpeza-cortinas', icon: Blinds, color: 'from-pink-500 to-pink-600' },
-    { name: 'Limpeza de Pisos', slug: 'limpeza-pisos', icon: HomeIcon, color: 'from-amber-500 to-amber-600' },
-    { name: 'Limpeza de Caixa d\'Água', slug: 'limpeza-caixa-dagua', icon: Droplets, color: 'from-cyan-500 to-cyan-600' },
-    { name: 'Limpeza de Vidros', slug: 'limpeza-vidros', icon: Wind, color: 'from-sky-500 to-sky-600' },
-    { name: 'Limpeza de Fachada', slug: 'limpeza-fachada', icon: Building2, color: 'from-emerald-500 to-emerald-600' },
-    { name: 'Limpeza Pós-Obra', slug: 'limpeza-pos-obra', icon: HardHat, color: 'from-red-500 to-red-600' },
-    { name: 'Higienização', slug: 'higienizacao', icon: Sparkles, color: 'from-violet-500 to-violet-600' },
-    { name: 'Limpeza Comercial', slug: 'limpeza-comercial', icon: Warehouse, color: 'from-teal-500 to-teal-600' },
+    {
+        name: 'Limpeza de Sofá',
+        slug: 'limpeza-sofa',
+        icon: Sofa,
+        color: 'from-blue-500 to-blue-600',
+        image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza de Colchão',
+        slug: 'limpeza-colchao',
+        icon: BedDouble,
+        color: 'from-purple-500 to-purple-600',
+        image: 'https://images.unsplash.com/photo-1626806819282-2c1dc61a0e1c?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza de Carpete',
+        slug: 'limpeza-carpete',
+        icon: Brush,
+        color: 'from-orange-500 to-orange-600',
+        image: 'https://images.unsplash.com/photo-1558317374-067df5f15430?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza de Cortinas',
+        slug: 'limpeza-cortinas',
+        icon: Blinds,
+        color: 'from-pink-500 to-pink-600',
+        image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza de Pisos',
+        slug: 'limpeza-pisos',
+        icon: HomeIcon,
+        color: 'from-amber-500 to-amber-600',
+        image: 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza de Caixa d\'Água',
+        slug: 'limpeza-caixa-dagua',
+        icon: Droplets,
+        color: 'from-cyan-500 to-cyan-600',
+        image: 'https://images.unsplash.com/photo-1504333638930-c8787321eba0?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza de Vidros',
+        slug: 'limpeza-vidros',
+        icon: Wind,
+        color: 'from-sky-500 to-sky-600',
+        image: 'https://images.unsplash.com/photo-1455218873509-8097305ee378?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza de Fachada',
+        slug: 'limpeza-fachada',
+        icon: Building2,
+        color: 'from-emerald-500 to-emerald-600',
+        image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza Pós-Obra',
+        slug: 'limpeza-pos-obra',
+        icon: HardHat,
+        color: 'from-red-500 to-red-600',
+        image: 'https://images.unsplash.com/photo-1581579134221-a70a0a542095?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Higienização',
+        slug: 'higienizacao',
+        icon: Sparkles,
+        color: 'from-violet-500 to-violet-600',
+        image: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+        name: 'Limpeza Comercial',
+        slug: 'limpeza-comercial',
+        icon: Warehouse,
+        color: 'from-teal-500 to-teal-600',
+        image: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=500'
+    },
 ]
 
 const STEPS = [
@@ -76,16 +142,16 @@ export default function Home() {
                             <Sparkles className="w-4 h-4 text-green" />
                             <span className="text-green text-sm font-medium">O Marketplace #1 de Limpeza</span>
                         </div>
-                        <h1 className="text-4xl md:text-6xl font-extrabold text-white leading-tight mb-6">
-                            Encontre os Melhores{' '}
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green to-emerald-400">
-                                Profissionais de Limpeza
-                            </span>{' '}
+                        <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.1] mb-6 tracking-tight">
+                            Encontre os <br className="hidden md:block" />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#39FF14] via-green to-emerald-400">
+                                Melhores Profissionais
+                            </span><br className="hidden md:block" />
                             da Sua Região
                         </h1>
-                        <p className="text-lg md:text-xl text-white/70 mb-8 max-w-2xl mx-auto">
-                            Conectamos você com profissionais verificados para todos os tipos de limpeza.
-                            Agende em minutos, pague com segurança.
+                        <p className="text-xl md:text-2xl text-white/80 mb-10 max-w-2xl mx-auto font-light leading-relaxed">
+                            Conectamos você com especialistas verificados para <span className="text-white font-medium italic">todo tipo de limpeza</span>.
+                            Agende em minutos, brilhe sempre.
                         </p>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Link
@@ -138,18 +204,31 @@ export default function Home() {
                             <Link
                                 key={service.slug}
                                 to={`/servicos?categoria=${service.slug}`}
-                                className="group bg-white rounded-2xl p-5 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-green/30 hover:-translate-y-1"
+                                className="group relative overflow-hidden rounded-2xl aspect-[4/3] shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col justify-end p-5"
                                 style={{ animationDelay: `${i * 50}ms` }}
                             >
-                                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${service.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                    <service.icon className="w-6 h-6 text-white" />
+                                {/* Background Image */}
+                                <div className="absolute inset-0">
+                                    <img
+                                        src={service.image}
+                                        alt={service.name}
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/40 to-transparent"></div>
                                 </div>
-                                <h3 className="font-semibold text-gray-800 text-sm group-hover:text-green transition-colors">
-                                    {service.name}
-                                </h3>
-                                <div className="flex items-center gap-1 mt-2 text-green opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <span className="text-xs font-medium">Ver mais</span>
-                                    <ChevronRight className="w-3 h-3" />
+
+                                {/* Content */}
+                                <div className="relative z-10">
+                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${service.color} flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform`}>
+                                        <service.icon className="w-5 h-5 text-white" />
+                                    </div>
+                                    <h3 className="font-bold text-white text-lg group-hover:text-green transition-colors leading-tight">
+                                        {service.name}
+                                    </h3>
+                                    <div className="flex items-center gap-1 mt-2 text-green translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                        <span className="text-xs font-bold uppercase tracking-wider">Ver Profissionais</span>
+                                        <ChevronRight className="w-4 h-4" />
+                                    </div>
                                 </div>
                             </Link>
                         ))}

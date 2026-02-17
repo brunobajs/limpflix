@@ -8,10 +8,11 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle
+    AlertCircle, GraduationCap, Gift
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
 import ChatWindow from '../components/ChatWindow'
+import { sendPayoutPix } from '../lib/payouts'
 
 const SERVICE_OPTIONS = [
     'Limpeza de Sofá', 'Limpeza de Colchão', 'Limpeza de Carpete',
@@ -47,6 +48,7 @@ export default function ProviderDashboard() {
     const [selectedChat, setSelectedChat] = useState(null)
     const [transactions, setTransactions] = useState([])
     const [loadingTransactions, setLoadingTransactions] = useState(false)
+    const [isWithdrawing, setIsWithdrawing] = useState(false)
 
     useEffect(() => {
         if (!user) {
@@ -115,6 +117,12 @@ export default function ProviderDashboard() {
                 updated_at: new Date().toISOString()
             }
 
+            if (newStatus === 'in_progress') {
+                updates.started_at = new Date().toISOString()
+            } else if (newStatus === 'waiting_client_confirmation') {
+                updates.completed_at = new Date().toISOString()
+            }
+
             const { error } = await supabase
                 .from('service_bookings')
                 .update(updates)
@@ -126,6 +134,9 @@ export default function ProviderDashboard() {
             if (newStatus === 'in_progress') {
                 await supabase.from('service_providers').update({ is_busy: true }).eq('id', provider.id)
                 setProvider(prev => ({ ...prev, is_busy: true }))
+            } else if (newStatus === 'completed' || newStatus === 'canceled') {
+                await supabase.from('service_providers').update({ is_busy: false }).eq('id', provider.id)
+                setProvider(prev => ({ ...prev, is_busy: false }))
             }
 
             // Refresh local state
@@ -135,6 +146,62 @@ export default function ProviderDashboard() {
         } catch (err) {
             console.error('Error updating booking:', err)
             alert('Erro ao atualizar agendamento. Tente novamente.')
+        }
+    }
+
+    async function handleWithdraw() {
+        if (!provider.pix_key) {
+            alert('Por favor, cadastre sua chave PIX nas configurações primeiro.')
+            return
+        }
+
+        const balance = provider.wallet_balance || 0
+        if (balance < 20) {
+            alert('O saldo mínimo para saque é R$ 20,00')
+            return
+        }
+
+        if (!confirm(`Deseja sacar R$ ${balance.toFixed(2)} para a chave ${provider.pix_key}?`)) {
+            return
+        }
+
+        setIsWithdrawing(true)
+        try {
+            // 1. Chamar utilitário de Payout
+            await sendPayoutPix({
+                pixKey: provider.pix_key,
+                amount: balance,
+                description: `Saque LimpFlix - ${provider.trade_name || provider.responsible_name}`
+            })
+
+            // 2. Atualizar saldo no Supabase (zera o saldo atual)
+            // Em produção, isso seria feito por um webhook ou transaction atômica
+            const { error: updateError } = await supabase
+                .from('service_providers')
+                .update({
+                    wallet_balance: 0,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', provider.id)
+
+            if (updateError) throw updateError
+
+            // 3. Registrar a transação de saída
+            await supabase.from('financial_transactions').insert({
+                provider_id: provider.id,
+                amount: balance,
+                type: 'outgoing',
+                status: 'completed',
+                description: 'Saque realizado via PIX'
+            })
+
+            alert('Saque solicitado com sucesso! O valor cairá em sua conta em instantes.')
+            loadProviderData() // Recarrega os dados
+        } catch (err) {
+            console.error('Withdraw error:', err)
+            alert('Erro ao processar saque: ' + err.message)
+        } finally {
+            setIsWithdrawing(false)
         }
     }
 
@@ -185,11 +252,17 @@ export default function ProviderDashboard() {
         }
     }
 
-    function copyReferralLink() {
-        const link = `${window.location.origin}/cadastro-profissional?ref=${provider?.referral_code}`
+    function copyReferralLink(type) {
+        const link = type === 'provider'
+            ? `${window.location.origin}/cadastro-profissional?ref=${provider?.referral_code}`
+            : `${window.location.origin}/profissionais?ref=${provider?.referral_code}`;
         navigator.clipboard.writeText(link)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
+    }
+
+    function futureFeatureAlert() {
+        alert('Esta funcionalidade está em fase de desenvolvimento e estará disponível em breve!')
     }
 
     if (loading) {
@@ -229,7 +302,7 @@ export default function ProviderDashboard() {
         { label: 'Serviços Realizados', value: provider.total_services || 0, icon: TrendingUp, color: 'from-blue-500 to-blue-600' },
         { label: 'Avaliação Média', value: provider.rating?.toFixed(1) || '5.0', icon: Award, color: 'from-yellow-500 to-yellow-600' },
         { label: 'Avaliações', value: provider.total_reviews || 0, icon: Star, color: 'from-purple-500 to-purple-600' },
-        { label: 'Saldo Disponível', value: `R$ ${(provider.wallet_balance || 0).toFixed(2)}`, icon: DollarSign, color: 'from-green to-emerald-600' },
+        { label: 'Lucro Líquido', value: `R$ ${(provider.wallet_balance || 0).toFixed(2)}`, icon: DollarSign, color: 'from-green to-emerald-600' },
     ]
 
     const BookingCard = ({ booking, showActions = true }) => (
@@ -420,34 +493,73 @@ export default function ProviderDashboard() {
 
                         {/* Quick referral */}
                         {provider.referral_code && (
-                            <div className="bg-gradient-to-br from-navy to-navy-light rounded-2xl p-6 text-white">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <Share2 className="w-6 h-6 text-green" />
-                                    <h3 className="font-bold text-lg">Indique e Ganhe!</h3>
-                                </div>
-                                <p className="text-white/70 text-sm mb-4">
-                                    Compartilhe seu código de indicação e ganhe comissão de 1% sobre os serviços dos profissionais indicados.
-                                </p>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex-1 bg-white/10 rounded-xl px-4 py-3 font-mono text-lg text-center">
-                                        {provider.referral_code}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-gradient-to-br from-navy to-navy-light rounded-2xl p-6 text-white">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Building2 className="w-6 h-6 text-green" />
+                                        <h3 className="font-bold text-lg">Indicar Prestador</h3>
                                     </div>
-                                    <button onClick={copyReferralCode}
-                                        className="bg-green hover:bg-green-dark px-4 py-3 rounded-xl font-medium transition-all flex items-center gap-2">
-                                        {copied ? <CheckCircle2 className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                                        {copied ? 'Copiado!' : 'Copiar'}
+                                    <p className="text-white/70 text-sm mb-4">
+                                        Indique profissionais e ganhe 1% de comissão permanente sobre os serviços deles.
+                                    </p>
+                                    <button onClick={() => copyReferralLink('provider')}
+                                        className="w-full bg-green hover:bg-green-dark py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                        {copied ? <CheckCircle2 className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+                                        Copiar Link de Cadastro
                                     </button>
                                 </div>
-                                <button onClick={copyReferralLink}
-                                    className="mt-3 text-green hover:text-white text-sm font-medium transition-colors flex items-center gap-1">
-                                    <Share2 className="w-4 h-4" />
-                                    Copiar link de indicação
-                                </button>
-                                <p className="text-white/50 text-xs mt-3">
-                                    Indicações realizadas: {provider.total_referrals || 0}
-                                </p>
+
+                                <div className="bg-gradient-to-br from-green to-emerald-700 rounded-2xl p-6 text-white shadow-lg">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Users className="w-6 h-6 text-navy" />
+                                        <h3 className="font-bold text-lg">Indicar Cliente</h3>
+                                    </div>
+                                    <p className="text-white/90 text-sm mb-4">
+                                        Traga seus clientes! Você ganha 1% de comissão e tem <strong>prioridade exclusiva</strong> para atendê-los.
+                                    </p>
+                                    <button onClick={() => copyReferralLink('client')}
+                                        className="w-full bg-navy hover:bg-navy-light text-white py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                        {copied ? <CheckCircle2 className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+                                        Copiar Link para Clientes
+                                    </button>
+                                </div>
                             </div>
                         )}
+
+                        {/* Future Features (Small placeholders) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <button
+                                onClick={futureFeatureAlert}
+                                className="flex items-center justify-between p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <Gift className="w-6 h-6 text-amber-600" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className="font-bold text-gray-900 leading-tight">Clube de Benefícios</h3>
+                                        <p className="text-xs text-gray-400">Descontos exclusivos em parceiros</p>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-amber-500" />
+                            </button>
+
+                            <button
+                                onClick={futureFeatureAlert}
+                                className="flex items-center justify-between p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <GraduationCap className="w-6 h-6 text-blue-600" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className="font-bold text-gray-900 leading-tight">Cursos e Treinamentos</h3>
+                                        <p className="text-xs text-gray-400">Capacite-se para ganhar mais</p>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -493,10 +605,18 @@ export default function ProviderDashboard() {
                                         <p className="font-bold text-navy">{provider.pix_key}</p>
                                     </div>
                                     <button
-                                        disabled={(provider.wallet_balance || 0) < 20}
-                                        className="w-full sm:w-auto bg-green hover:bg-green-dark text-white px-8 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 disabled:grayscale"
+                                        onClick={handleWithdraw}
+                                        disabled={(provider.wallet_balance || 0) < 20 || isWithdrawing}
+                                        className="w-full sm:w-auto bg-green hover:bg-green-dark text-white px-8 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
                                     >
-                                        {(provider.wallet_balance || 0) < 20 ? 'Mínimo R$ 20,00' : 'Sacar Agora'}
+                                        {isWithdrawing ? (
+                                            <>
+                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                                Processando...
+                                            </>
+                                        ) : (
+                                            (provider.wallet_balance || 0) < 20 ? 'Mínimo R$ 20,00' : 'Sacar Agora'
+                                        )}
                                     </button>
                                 </div>
                             ) : (

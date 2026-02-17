@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-    MessageCircle, Calendar, MapPin, DollarSign,
-    Send, User, Clock, CheckCircle2, AlertCircle,
-    Loader2
+    Loader2, Star
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -16,6 +14,10 @@ export default function ClientDashboard() {
     const [activeBooking, setActiveBooking] = useState(null)
     const [messages, setMessages] = useState([])
     const [newMessage, setNewMessage] = useState('')
+    const [showReviewModal, setShowReviewModal] = useState(false)
+    const [reviewRating, setReviewRating] = useState(5)
+    const [reviewText, setReviewText] = useState('')
+    const [submittingReview, setSubmittingReview] = useState(false)
     const messagesEndRef = useRef(null)
 
     // Poll for messages in real-time (simplified)
@@ -95,7 +97,11 @@ export default function ClientDashboard() {
         try {
             const { error } = await supabase
                 .from('service_bookings')
-                .update({ status: 'completed', updated_at: new Date().toISOString() })
+                .update({
+                    status: 'completed',
+                    updated_at: new Date().toISOString(),
+                    completed_at: new Date().toISOString()
+                })
                 .eq('id', activeBooking.id)
 
             if (error) throw error
@@ -105,11 +111,60 @@ export default function ClientDashboard() {
                 .update({ is_busy: false })
                 .eq('id', activeBooking.provider_id)
 
-            alert('Serviço confirmado e pagamento liberado ao profissional!')
             checkActiveBooking(activeBooking.provider_id)
+            setShowReviewModal(true) // Open review modal
         } catch (err) {
             console.error(err)
             alert('Erro ao confirmar serviço.')
+        }
+    }
+
+    async function submitReview() {
+        if (!activeBooking) return
+        setSubmittingReview(true)
+        try {
+            // 1. Update Booking with rating/review
+            const { error: bookingError } = await supabase
+                .from('service_bookings')
+                .update({
+                    rating: reviewRating,
+                    review: reviewText,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', activeBooking.id)
+
+            if (bookingError) throw bookingError
+
+            // 2. Fetch current provider stats
+            const { data: provider } = await supabase
+                .from('service_providers')
+                .select('rating, total_reviews')
+                .eq('id', activeBooking.provider_id)
+                .single()
+
+            if (provider) {
+                const newTotalReviews = (provider.total_reviews || 0) + 1
+                const newRating = ((provider.rating * provider.total_reviews) + reviewRating) / newTotalReviews
+
+                // 3. Update Provider stats
+                await supabase
+                    .from('service_providers')
+                    .update({
+                        rating: newRating,
+                        total_reviews: newTotalReviews,
+                        total_services: (provider.total_services || 0) + 1 // Assuming 1 service = 1 completed booking
+                    })
+                    .eq('id', activeBooking.provider_id)
+            }
+
+            alert('Avaliação enviada com sucesso! Obrigado.')
+            setShowReviewModal(false)
+            checkActiveBooking(activeBooking.provider_id)
+        } catch (err) {
+            console.error(err)
+            alert('Erro ao enviar avaliação.')
+        } finally {
+            setSubmittingReview(false)
         }
     }
 
@@ -135,7 +190,10 @@ export default function ClientDashboard() {
 
     function handleHire() {
         if (!selectedChat) return
-        navigate(`/pagamento?quote_id=${selectedChat.quote_request_id}&provider_id=${selectedChat.provider.id}&chat_id=${selectedChat.id}`)
+        // No futuro, o preço pode ser extraído de uma proposta formal no BD.
+        // Por enquanto, usaremos o padrão ou permitiremos que o cliente ajuste se necessário.
+        const defaultAmount = 200.00
+        navigate(`/pagamento?quote_id=${selectedChat.quote_request_id}&provider_id=${selectedChat.provider.id}&chat_id=${selectedChat.id}&amount=${defaultAmount}`)
     }
 
     if (loading) {
@@ -271,8 +329,8 @@ export default function ClientDashboard() {
                                     return (
                                         <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                                             <div className={`max-w-[80%] rounded-2xl p-3.5 shadow-sm ${isMe
-                                                    ? 'bg-green text-white rounded-tr-none'
-                                                    : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
+                                                ? 'bg-green text-white rounded-tr-none'
+                                                : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
                                                 }`}>
                                                 <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                                                 <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
@@ -315,6 +373,61 @@ export default function ClientDashboard() {
                     )}
                 </div>
             </div>
+            {/* Review Modal */}
+            {showReviewModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-fade-in">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900">Avalie o Serviço</h2>
+                            <p className="text-sm text-gray-500">Sua opinião é muito importante para nós e para o profissional.</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="flex justify-center gap-2">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                        key={star}
+                                        onClick={() => setReviewRating(star)}
+                                        className="focus:outline-none transform transition-transform hover:scale-110"
+                                    >
+                                        <Star
+                                            className={`w-10 h-10 ${star <= reviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`}
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Seu comentário (opcional)</label>
+                                <textarea
+                                    value={reviewText}
+                                    onChange={(e) => setReviewText(e.target.value)}
+                                    rows={3}
+                                    placeholder="Como foi sua experiência?"
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green resize-none"
+                                />
+                            </div>
+
+                            <button
+                                onClick={submitReview}
+                                disabled={submittingReview}
+                                className="w-full bg-green hover:bg-green-dark text-white py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {submittingReview ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enviar Avaliação'}
+                            </button>
+                            <button
+                                onClick={() => setShowReviewModal(false)}
+                                className="w-full text-gray-400 text-sm font-medium hover:text-gray-600"
+                            >
+                                Pular agora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

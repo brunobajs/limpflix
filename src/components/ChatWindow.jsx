@@ -53,6 +53,26 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
 
             if (error) throw error
             setMessages(data || [])
+
+            // Marcar como lido
+            // Primeiro, descobrir se o usuário atual é o cliente ou o prestador nesta conversa
+            const { data: conv } = await supabase
+                .from('chat_conversations')
+                .select('client_id, provider_id, service_providers!inner(user_id)')
+                .eq('id', conversationId)
+                .single()
+
+            if (conv) {
+                const isProvider = conv.service_providers.user_id === user.id
+                const updateData = isProvider
+                    ? { provider_last_read_at: new Date().toISOString() }
+                    : { client_last_read_at: new Date().toISOString() }
+
+                await supabase
+                    .from('chat_conversations')
+                    .update(updateData)
+                    .eq('id', conversationId)
+            }
         } catch (err) {
             console.error('Error loading messages:', err)
         } finally {
@@ -145,8 +165,8 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                         >
                             <div
                                 className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${msg.sender_id === user.id
-                                        ? 'bg-green text-white rounded-br-none'
-                                        : 'bg-white text-gray-700 border border-gray-100 rounded-bl-none'
+                                    ? 'bg-green text-white rounded-br-none'
+                                    : 'bg-white text-gray-700 border border-gray-100 rounded-bl-none'
                                     }`}
                             >
                                 <p className="whitespace-pre-wrap">{msg.content}</p>

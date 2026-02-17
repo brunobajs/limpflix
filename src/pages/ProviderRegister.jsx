@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
     Building2, User, Wrench, CreditCard,
     ChevronRight, ChevronLeft, CheckCircle2, Loader2,
-    Phone, Mail, MapPin, ArrowLeft
+    Phone, Mail, MapPin, ArrowLeft, Camera, Image, Plus, X
 } from 'lucide-react'
 
 const SERVICE_OPTIONS = [
@@ -45,10 +45,20 @@ export default function ProviderRegister() {
         password: '',
         // Step 3 - Services
         services_offered: [],
-        // Step 4 - Payment
+        // Step 4 - Media (NEW)
+        profile_image: null,
+        logo_image: null,
+        portfolio_images: [],
+        // Step 5 - Payment
         pix_key: '',
         // Referral
         referral_code_input: searchParams.get('ref') || '',
+    })
+
+    const [uploading, setUploading] = useState({
+        profile: false,
+        logo: false,
+        portfolio: false
     })
 
     function updateForm(field, value) {
@@ -78,12 +88,28 @@ export default function ProviderRegister() {
         return { latitude: null, longitude: null }
     }
 
-    function generateReferralCode() {
-        const prefix = (form.trade_name || form.responsible_name || 'LP')
-            .replace(/\s+/g, '')
-            .substring(0, 4)
-            .toUpperCase()
-        return `${prefix}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    async function uploadMedia(file, folder) {
+        if (!file) return null
+        try {
+            const fileExt = file.name.split('.').pop()
+            const fileName = `${Math.random()}.${fileExt}`
+            const filePath = `${folder}/${fileName}`
+
+            const { error: uploadError } = await supabase.storage
+                .from('providers-media')
+                .upload(filePath, file)
+
+            if (uploadError) throw uploadError
+
+            const { data } = supabase.storage
+                .from('providers-media')
+                .getPublicUrl(filePath)
+
+            return data.publicUrl
+        } catch (err) {
+            console.error('Upload error:', err)
+            throw new Error(`Erro ao enviar imagem: ${err.message}`)
+        }
     }
 
     async function handleSubmit() {
@@ -96,25 +122,28 @@ export default function ProviderRegister() {
                 const { data } = await signUp(form.email, form.password, form.responsible_name)
                 userId = data?.user?.id
                 if (!userId) {
-                    setError('Conta criada! Verifique seu email para confirmar e tente novamente.')
+                    setError('Quase lá! Enviamos um e-mail de confirmação da LimpFlix para você. Verifique sua caixa de entrada (e spam) para ativar sua conta e concluir o cadastro.')
                     setLoading(false)
                     return
                 }
             }
 
-            // 2. Get coordinates from address
-            const coords = await getCoordinates()
+            // 2. Upload images if provided
+            const profileUrl = form.profile_image instanceof File ? await uploadMedia(form.profile_image, 'profiles') : form.profile_image
+            const logoUrl = form.logo_image instanceof File ? await uploadMedia(form.logo_image, 'logos') : form.logo_image
 
-            // 3. Find referrer if code provided
-            let referrerId = null
-            if (form.referral_code_input) {
-                const { data: referrer } = await supabase
-                    .from('service_providers')
-                    .select('id')
-                    .eq('referral_code', form.referral_code_input.toUpperCase())
-                    .single()
-                referrerId = referrer?.id || null
+            const portfolioUrls = []
+            for (const item of form.portfolio_images) {
+                if (item instanceof File) {
+                    const url = await uploadMedia(item, 'portfolio')
+                    portfolioUrls.push(url)
+                } else {
+                    portfolioUrls.push(item)
+                }
             }
+
+            // 3. Get coordinates from address
+            const coords = await getCoordinates()
 
             // 4. Save provider to Supabase
             const { error: insertError } = await supabase
@@ -134,10 +163,13 @@ export default function ProviderRegister() {
                     latitude: coords.latitude,
                     longitude: coords.longitude,
                     services_offered: form.services_offered,
+                    profile_image: profileUrl,
+                    logo_image: logoUrl,
+                    portfolio_images: portfolioUrls,
                     pix_key: form.pix_key,
                     referral_code: generateReferralCode(),
                     referrer_id: referrerId,
-                    status: 'approved', // Auto-approve for now
+                    status: 'approved',
                 })
 
             if (insertError) throw insertError
@@ -160,6 +192,7 @@ export default function ProviderRegister() {
         switch (step) {
             case 1:
                 if (!form.legal_name.trim()) return 'Preencha a Razão Social / Nome'
+                if (!form.cnpj.trim()) return 'Preencha o CNPJ (Obrigatório)'
                 return null
             case 2:
                 if (!form.responsible_name.trim()) return 'Preencha o nome do responsável'
@@ -184,7 +217,7 @@ export default function ProviderRegister() {
             return
         }
         setError('')
-        if (step < 4) setStep(step + 1)
+        if (step < 5) setStep(step + 1)
         else handleSubmit()
     }
 
@@ -192,7 +225,8 @@ export default function ProviderRegister() {
         { num: 1, label: 'Empresa', icon: Building2 },
         { num: 2, label: 'Contato', icon: User },
         { num: 3, label: 'Serviços', icon: Wrench },
-        { num: 4, label: 'Pagamento', icon: CreditCard },
+        { num: 4, label: 'Fotos', icon: Camera },
+        { num: 5, label: 'Pagamento', icon: CreditCard },
     ]
 
     return (
@@ -271,9 +305,10 @@ export default function ProviderRegister() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ (opcional)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ *</label>
                                 <input type="text" value={form.cnpj} onChange={(e) => updateForm('cnpj', e.target.value)}
-                                    placeholder="00.000.000/0000-00"
+                                    placeholder="00.000.000/0000-00 (Obrigatório)"
+                                    required
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green text-gray-800"
                                 />
                             </div>
@@ -397,8 +432,99 @@ export default function ProviderRegister() {
                         </div>
                     )}
 
-                    {/* Step 4 - Payment */}
+                    {/* Step 4 - Media */}
                     {step === 4 && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h2 className="text-lg font-bold text-gray-900 mb-1">Fotos e Portfólio</h2>
+                            <p className="text-gray-500 text-sm mb-6">Destaque seu perfil com imagens reais (Opcional)</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                {/* Profile Photo */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Foto de Perfil</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
+                                            {form.profile_image ? (
+                                                <img src={typeof form.profile_image === 'string' ? form.profile_image : URL.createObjectURL(form.profile_image)} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <User className="w-8 h-8 text-gray-400" />
+                                            )}
+                                        </div>
+                                        <input
+                                            type="file"
+                                            id="profile-upload"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={(e) => updateForm('profile_image', e.target.files[0])}
+                                        />
+                                        <label htmlFor="profile-upload" className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors">
+                                            Alterar
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Logo */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Logotipo da Empresa</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
+                                            {form.logo_image ? (
+                                                <img src={typeof form.logo_image === 'string' ? form.logo_image : URL.createObjectURL(form.logo_image)} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Building2 className="w-8 h-8 text-gray-400" />
+                                            )}
+                                        </div>
+                                        <input
+                                            type="file"
+                                            id="logo-upload"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={(e) => updateForm('logo_image', e.target.files[0])}
+                                        />
+                                        <label htmlFor="logo-upload" className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors">
+                                            Alterar
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Portfolio */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Portfólio (Fotos de outros trabalhos)</label>
+                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                                    {form.portfolio_images.map((img, idx) => (
+                                        <div key={idx} className="aspect-square bg-gray-100 rounded-xl relative group overflow-hidden">
+                                            <img src={typeof img === 'string' ? img : URL.createObjectURL(img)} className="w-full h-full object-cover" />
+                                            <button
+                                                onClick={() => setForm(prev => ({ ...prev, portfolio_images: prev.portfolio_images.filter((_, i) => i !== idx) }))}
+                                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <input
+                                        type="file"
+                                        id="portfolio-upload"
+                                        className="hidden"
+                                        multiple
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const files = Array.from(e.target.files)
+                                            setForm(prev => ({ ...prev, portfolio_images: [...prev.portfolio_images, ...files] }))
+                                        }}
+                                    />
+                                    <label htmlFor="portfolio-upload" className="aspect-square bg-gray-50 hover:bg-gray-100 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all gap-1">
+                                        <Plus className="w-6 h-6 text-gray-400" />
+                                        <span className="text-[10px] text-gray-500 font-medium">Adicionar</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 5 - Payment */}
+                    {step === 5 && (
                         <div className="space-y-5 animate-fade-in">
                             <h2 className="text-lg font-bold text-gray-900 mb-1">Dados de Pagamento</h2>
                             <p className="text-gray-500 text-sm mb-4">Informações para receber seus pagamentos</p>
@@ -452,7 +578,7 @@ export default function ProviderRegister() {
                         >
                             {loading ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : step === 4 ? (
+                            ) : step === 5 ? (
                                 <>
                                     Finalizar Cadastro
                                     <CheckCircle2 className="w-5 h-5" />

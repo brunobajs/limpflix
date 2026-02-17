@@ -133,11 +133,32 @@ export default function ProviderProfile() {
                     <div className="lg:col-span-2 space-y-6">
                         {/* About */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                            <h2 className="text-lg font-bold text-gray-900 mb-3">Sobre</h2>
+                            <div className="flex items-start justify-between mb-3">
+                                <h2 className="text-lg font-bold text-gray-900">Sobre</h2>
+                                {provider.logo_image && (
+                                    <div className="w-16 h-16 bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
+                                        <img src={provider.logo_image} alt="Logo" className="w-full h-full object-contain" />
+                                    </div>
+                                )}
+                            </div>
                             <p className="text-gray-600 leading-relaxed">
                                 {provider.bio || 'Profissional qualificado e comprometido com a excelência nos serviços de limpeza.'}
                             </p>
                         </div>
+
+                        {/* Portfolio Gallery */}
+                        {provider.portfolio_images?.length > 0 && (
+                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                                <h2 className="text-lg font-bold text-gray-900 mb-4">Portfólio / Trabalhos Realizados</h2>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    {provider.portfolio_images.map((img, i) => (
+                                        <div key={i} className="aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity">
+                                            <img src={img} alt={`Trabalho ${i + 1}`} className="w-full h-full object-cover" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Services */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">

@@ -16,7 +16,7 @@ export default function PaymentPage() {
 
     const [loading, setLoading] = useState(false)
     const [processing, setProcessing] = useState(false)
-    const [paymentMethod, setPaymentMethod] = useState('pix') // pix or credit_card
+    const [amount, setAmount] = useState(parseFloat(searchParams.get('amount')) || 200.00)
     const [provider, setProvider] = useState(null)
     const [service, setService] = useState(null)
 
@@ -36,8 +36,7 @@ export default function PaymentPage() {
             const { data: prov } = await supabase.from('service_providers').select('*').eq('id', providerId).single()
             setProvider(prov)
 
-            // Fetch quote details to show service name/price (mocked price for now since it's negotiated in chat)
-            // In a real app, the price would be passed or stored in the quote/chat agreement
+            // Price is dynamic from URL
         } catch (err) {
             console.error(err)
         } finally {
@@ -56,19 +55,22 @@ export default function PaymentPage() {
             const preference = await createPaymentPreference({
                 clientEmail: user.email,
                 serviceName: 'Serviço LimpFlix - ' + (provider.trade_name || provider.responsible_name),
-                amount: 200.00
+                amount: amount,
+                metadata: {
+                    provider_id: providerId,
+                    client_id: user.id,
+                    quote_id: quoteId || '',
+                    amount: amount,
+                    service_name: 'Limpeza/Serviço especial'
+                }
             })
 
             // 2. Redirecionar para o Mercado Pago (Checkout Pro)
-            // Ou o usuário pode escolher abrir em nova aba
             if (preference.init_point) {
                 window.location.href = preference.init_point
             } else {
                 throw new Error('Não foi possível gerar o link de pagamento')
             }
-
-            // Nota: O registro do Booking será feito pelo Webhook ou na volta do "success"
-            // Para esta demo, deixaremos o usuário completar o fluxo no MP.
 
         } catch (err) {
             console.error('Payment Error', err)
@@ -78,7 +80,7 @@ export default function PaymentPage() {
         }
     }
 
-    if (loading) return <div className="p-8"><Loader2 className="animate-spin text-green" /></div>
+    if (loading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-green" /></div>
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -94,18 +96,18 @@ export default function PaymentPage() {
                         <h2 className="text-gray-500 text-sm font-semibold uppercase tracking-wider mb-2">Resumo</h2>
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                             <span className="text-gray-800 font-medium">Prestador</span>
-                            <span className="text-gray-900 font-bold">{provider?.trade_name}</span>
+                            <span className="text-gray-900 font-bold">{provider?.trade_name || provider?.responsible_name}</span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                             <span className="text-gray-800 font-medium">Serviço</span>
-                            <span className="text-gray-900">Limpeza/Serviço</span>
+                            <span className="text-gray-900">Limpeza/Serviço especial</span>
                         </div>
                         <div className="flex justify-between items-center py-4">
                             <span className="text-gray-800 font-bold text-lg">Total</span>
-                            <span className="text-green font-bold text-2xl">R$ 200,00</span>
+                            <span className="text-green font-bold text-2xl">R$ {amount.toFixed(2)}</span>
                         </div>
                         <p className="text-xs text-gray-400 text-center mt-2">
-                            *Valor simbólico para demonstração. O valor real seria acordado no chat.
+                            *Pagamento processado via Mercado Pago.
                         </p>
                     </div>
 
