@@ -192,13 +192,13 @@ export default function Home() {
 
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
-                            <div className="relative z-10 w-full max-w-[450px] ml-auto overflow-hidden rounded-3xl shadow-2xl" style={{ height: '400px' }}>
+                            <div className="relative z-10 w-full max-w-[500px] ml-auto overflow-hidden rounded-3xl" style={{ height: '450px' }}>
                                 <div className="absolute inset-0 bg-green/5 blur-3xl"></div>
-                                <div className="relative w-full h-full overflow-hidden">
+                                <div className="relative w-full h-full">
                                     <img
                                         src="/assets/professional_v2.jpg"
                                         alt="Boas-vindas LimpFlix"
-                                        className="w-full h-full object-cover object-center scale-[1.5] origin-center"
+                                        className="w-full h-full object-contain object-bottom"
                                         loading="eager"
                                         onError={(e) => {
                                             e.target.src = "/assets/professional.png"
