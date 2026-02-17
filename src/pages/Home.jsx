@@ -155,7 +155,7 @@ export default function Home() {
                             </h1>
                             <p className="text-xl md:text-2xl text-white/80 mb-10 font-light leading-relaxed">
                                 Conectamos você com especialistas verificados para <span className="text-white font-medium italic">todo tipo de limpeza</span>.
-                                Agende em minutos, brilhe sempre.
+                                Agende em minutos.
                             </p>
                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <Link
@@ -166,11 +166,11 @@ export default function Home() {
                                     Buscar Profissionais
                                 </Link>
                                 <Link
-                                    to="/cadastro-profissional"
+                                    to="/servicos"
                                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-8 py-3.5 rounded-xl text-lg font-semibold transition-all border border-white/20"
                                 >
-                                    Seja um Profissional
-                                    <ArrowRight className="w-5 h-5" />
+                                    <Search className="w-5 h-5" />
+                                    Buscar Serviços
                                 </Link>
                             </div>
                             {/* Stats */}
@@ -192,13 +192,14 @@ export default function Home() {
 
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
-                            <div className="relative z-10 w-full aspect-square max-w-[500px] ml-auto">
-                                <div className="absolute inset-0 bg-green/20 rounded-3xl blur-2xl"></div>
-                                <div className="absolute inset-0 bg-navy-light/40 backdrop-blur-sm border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+                            <div className="relative z-10 w-full aspect-[4/5] max-w-[450px] ml-auto">
+                                <div className="absolute inset-0 bg-green/10 rounded-3xl blur-3xl"></div>
+                                <div className="absolute inset-0 bg-navy-light/20 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
                                     <img
                                         src="/assets/professional.png"
                                         alt="Boas-vindas LimpFlix"
-                                        className="w-full h-full object-contain object-bottom"
+                                        className="w-full h-full object-cover object-center scale-110"
+                                        loading="eager"
                                         onError={(e) => {
                                             e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=800"
                                             e.target.className = "w-full h-full object-cover opacity-50 contrast-125"

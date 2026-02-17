@@ -9,9 +9,7 @@ export default function Footer() {
                     {/* Logo & Description */}
                     <div className="col-span-1 md:col-span-2">
                         <Link to="/" className="flex items-center gap-2 mb-4">
-                            <div className="w-9 h-9 bg-green rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                                L
-                            </div>
+                            <Sparkles className="w-6 h-6 text-green" />
                             <span className="text-xl font-bold">
                                 Limp<span className="text-green">Flix</span>
                             </span>
@@ -50,7 +48,7 @@ export default function Footer() {
                         <ul className="space-y-3">
                             <li className="flex items-center gap-2 text-white/60 text-sm">
                                 <Phone className="w-4 h-4 text-green" />
-                                (11) 99999-9999
+                                (19) 99506-0356
                             </li>
                             <li className="flex items-center gap-2 text-white/60 text-sm">
                                 <Mail className="w-4 h-4 text-green" />
