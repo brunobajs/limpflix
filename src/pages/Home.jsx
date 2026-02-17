@@ -12,14 +12,14 @@ const SERVICES = [
         slug: 'limpeza-sofa',
         icon: Sofa,
         color: 'from-blue-500 to-blue-600',
-        image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/sofa.png'
     },
     {
         name: 'Limpeza de Colchão',
         slug: 'limpeza-colchao',
         icon: BedDouble,
         color: 'from-purple-500 to-purple-600',
-        image: 'https://images.unsplash.com/photo-1626806819282-2c1dc61a0e1c?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/colchao.png'
     },
     {
         name: 'Limpeza de Carpete',
@@ -33,21 +33,21 @@ const SERVICES = [
         slug: 'limpeza-cortinas',
         icon: Blinds,
         color: 'from-pink-500 to-pink-600',
-        image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/cortina.png'
     },
     {
         name: 'Limpeza de Pisos',
         slug: 'limpeza-pisos',
         icon: HomeIcon,
         color: 'from-amber-500 to-amber-600',
-        image: 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/piso.png'
     },
     {
         name: 'Limpeza de Caixa d\'Água',
         slug: 'limpeza-caixa-dagua',
         icon: Droplets,
         color: 'from-cyan-500 to-cyan-600',
-        image: 'https://images.unsplash.com/photo-1504333638930-c8787321eba0?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/caixa-dagua.png'
     },
     {
         name: 'Limpeza de Vidros',
@@ -57,33 +57,40 @@ const SERVICES = [
         image: 'https://images.unsplash.com/photo-1455218873509-8097305ee378?auto=format&fit=crop&q=80&w=500'
     },
     {
-        name: 'Limpeza de Fachada',
-        slug: 'limpeza-fachada',
-        icon: Building2,
+        name: 'Limpeza de Piscina',
+        slug: 'limpeza-piscina',
+        icon: Droplets,
         color: 'from-emerald-500 to-emerald-600',
-        image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/piscina.png'
     },
     {
         name: 'Limpeza Pós-Obra',
         slug: 'limpeza-pos-obra',
         icon: HardHat,
         color: 'from-red-500 to-red-600',
-        image: 'https://images.unsplash.com/photo-1581579134221-a70a0a542095?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/pos-obra.png'
     },
     {
-        name: 'Higienização',
-        slug: 'higienizacao',
-        icon: Sparkles,
+        name: 'Impermeabilização',
+        slug: 'impermeabilizacao',
+        icon: Shield,
         color: 'from-violet-500 to-violet-600',
-        image: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/impermeabilizacao.png'
     },
     {
-        name: 'Limpeza Comercial',
-        slug: 'limpeza-comercial',
-        icon: Warehouse,
+        name: 'Faxina Residencial',
+        slug: 'faxina-residencial',
+        icon: HomeIcon,
         color: 'from-teal-500 to-teal-600',
-        image: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=500'
+        image: 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=500'
     },
+    {
+        name: 'Limpeza de Calçada',
+        slug: 'limpeza-calcada',
+        icon: Sparkles,
+        color: 'from-gray-500 to-gray-600',
+        image: '/assets/servicos/calcada.png'
+    }
 ]
 
 const STEPS = [
