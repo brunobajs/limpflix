@@ -26,7 +26,7 @@ const SERVICES = [
         slug: 'limpeza-carpete',
         icon: Brush,
         color: 'from-orange-500 to-orange-600',
-        image: 'https://images.unsplash.com/photo-1558317374-067df5f15430?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/carpete.png'
     },
     {
         name: 'Limpeza de Cortinas',
@@ -54,7 +54,7 @@ const SERVICES = [
         slug: 'limpeza-vidros',
         icon: Wind,
         color: 'from-sky-500 to-sky-600',
-        image: 'https://images.unsplash.com/photo-1455218873509-8097305ee378?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/vidros.png'
     },
     {
         name: 'Limpeza de Piscina',
@@ -82,7 +82,7 @@ const SERVICES = [
         slug: 'faxina-residencial',
         icon: HomeIcon,
         color: 'from-teal-500 to-teal-600',
-        image: 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=500'
+        image: '/assets/servicos/faxina.png'
     },
     {
         name: 'Limpeza de Calçada',
