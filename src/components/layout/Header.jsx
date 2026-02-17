@@ -31,9 +31,12 @@ export default function Header() {
                             <span className="text-2xl font-black text-white tracking-tighter leading-none">
                                 Limp<span className="text-green">Flix</span>
                             </span>
-                            <span className="text-[10px] text-green font-bold tracking-[0.2em] uppercase ml-0.5">
-                                Brilho Real
-                            </span>
+                            <div className="flex items-center gap-1.5 ml-0.5">
+                                <span className="text-[10px] text-green font-bold tracking-[0.2em] uppercase">
+                                    Brilho Real
+                                </span>
+                                <span className="text-[8px] text-white/20 font-mono">v1.1.0</span>
+                            </div>
                         </div>
                     </Link>
 
