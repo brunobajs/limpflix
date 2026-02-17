@@ -192,13 +192,13 @@ export default function Home() {
 
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
-                            <div className="relative z-10 w-full aspect-[4/5] max-w-[450px] ml-auto">
-                                <div className="absolute inset-0 bg-green/10 rounded-3xl blur-3xl"></div>
-                                <div className="absolute inset-0 bg-navy-light/20 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                            <div className="relative z-10 w-full aspect-square max-w-[500px] ml-auto">
+                                <div className="absolute inset-0 bg-green/5 rounded-3xl blur-3xl"></div>
+                                <div className="relative w-full h-full">
                                     <img
                                         src="/assets/professional.png"
                                         alt="Boas-vindas LimpFlix"
-                                        className="w-full h-full object-cover object-center scale-110"
+                                        className="w-full h-full object-contain object-bottom"
                                         loading="eager"
                                         onError={(e) => {
                                             e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=800"
