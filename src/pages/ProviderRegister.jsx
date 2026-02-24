@@ -144,33 +144,36 @@ export default function ProviderRegister() {
     }
 
     async function getCoordinates() {
+        console.log("Debug - Início getCoordinates")
         // Se já capturou manualmente, retorna elas
         if (form.latitude && form.longitude) {
-            console.log("Usando coordenadas capturadas manualmente:", form.latitude, form.longitude)
             return { latitude: form.latitude, longitude: form.longitude }
         }
 
+        const fallback = { latitude: -23.5505, longitude: -46.6333 }
+
         try {
             const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout
+            const timeoutId = setTimeout(() => {
+                console.warn("Geocoding timeout - forcing fallback")
+                controller.abort()
+            }, 3000) // Reduzido para 3s para evitar demora excessiva
 
             const address = `${form.address}, ${form.city}, ${form.state}, Brasil`
-            console.log("Geocodificando endereço:", address)
-
             const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, {
-                signal: controller.signal
+                signal: controller.signal,
+                headers: { 'User-Agent': 'LimpFlix-App' } // Nominatim exige User-Agent
             })
             clearTimeout(timeoutId)
 
             const data = await response.json()
-            if (data.length > 0) {
-                console.log("Coordenadas encontradas via geocoding:", data[0].lat, data[0].lon)
+            if (data && data.length > 0) {
                 return { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) }
             }
         } catch (err) {
-            console.warn('Geocoding failed or timed out:', err)
+            console.warn('Geocoding fail/timeout, using fallback:', err.message)
         }
-        return { latitude: -23.5505, longitude: -46.6333 } // Fallback São Paulo se falhar
+        return fallback
     }
 
     async function uploadMedia(file, folder) {
@@ -200,6 +203,7 @@ export default function ProviderRegister() {
     async function handleSubmit() {
         setError('')
         setLoading(true)
+        window.alert('PASSO 1: Iniciando envio do formulário...')
         try {
             setRegistrationStatus('Iniciando cadastro...')
             // 1. Create auth account if not logged in
@@ -280,6 +284,8 @@ export default function ProviderRegister() {
                 getCoordinates()
             ])
 
+            window.alert('PASSO 2: Fotos e Localização processadas com sucesso!')
+
             console.log("Processamento paralelo concluído:", { profileUrl, logoUrl, portfolioCount: portfolioUrls.length, coords })
 
             // 5. Gerar código de indicação único para o novo prestador
@@ -316,6 +322,8 @@ export default function ProviderRegister() {
                 throw rpcError
             }
 
+            window.alert('PASSO 3: Banco de dados (RPC) respondeu com sucesso!')
+
             setRegistrationStatus('Pronto! Redirecionando...')
             // ProviderRegister.jsx: Chamada de refreshProfile após sucesso
             try {
@@ -324,6 +332,7 @@ export default function ProviderRegister() {
                 console.warn("Profile refresh failed, but proceeding to dashboard:", pErr)
             }
 
+            window.alert('PASSO 4: Cadastro concluído! Redirecionando agora...')
             navigate('/dashboard?welcome=true')
         } catch (err) {
             console.error('Registration error detail:', err)
