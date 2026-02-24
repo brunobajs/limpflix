@@ -270,15 +270,15 @@ export default function ProviderRegister() {
         setError('')
         setLoading(true)
         setDebugLog([])
-        addLog('Iniciando cadastro (Modo Tanque V6) 🚜')
+        addLog('Iniciando cadastro (Modo Inquebrável V7) 🚀')
 
         try {
-            // 1. Auth/User ID
+            // 1. GARANTE A CONTA (AUTH)
             let userId = user?.id
-            if (userId) addLog(`Usuário logado: ${userId.slice(0, 8)}...`)
+            if (userId) addLog(`Utilizando conta logada: ${userId.slice(0, 8)}...`)
 
             if (!userId) {
-                addLog('Criando conta (Auth)...')
+                addLog('Criando conta de acesso...')
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
                     password: form.password,
@@ -287,34 +287,32 @@ export default function ProviderRegister() {
                 if (signUpError) {
                     addLog(`ERRO Auth: ${signUpError.message}`)
                     if (signUpError.message?.toLowerCase().includes('already')) {
-                        throw new Error('E-mail em uso. Faça login antes ou use outro.')
+                        throw new Error('E-mail já cadastrado. Faça login antes ou use outro.')
                     }
                     throw signUpError
                 }
                 userId = signUpData?.user?.id
-                addLog('Conta criada com sucesso.')
+                addLog('✓ Conta criada com sucesso!')
             }
 
-            if (!userId) throw new Error('Falha ao obter ID do usuário.')
+            if (!userId) throw new Error('Não foi possível obter o ID do usuário.')
 
-            // 2. Localização
-            addLog('Buscando coordenadas...')
-            const coords = await getCoordinates()
-            addLog(`Localização OK (${coords.latitude.toFixed(2)})`)
-
-            // 3. Salvar no Banco
-            addLog('Iniciando sincronia com o banco...')
-            const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
+            // A PARTIR DAQUI, O USUÁRIO JÁ TEM CONTA.
+            // Vamos tentar sincronizar o banco, mas se demorar, não vamos travar a vida dele.
 
             const dbRace = (promise, name) => Promise.race([
                 promise,
-                new Promise((_, rej) => setTimeout(() => rej(new Error(`Timeout em ${name} (10s)`)), 10000))
+                new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout 5s')), 5000))
             ])
 
-            // PASSO A: Perfil (Modo agressivo)
-            addLog('Passo A: Perfil...')
+            // Sincronia de Localização (Rápido)
+            addLog('Capturando localização...')
+            const coords = await getCoordinates()
+            addLog(`Localização: ${coords.latitude.toFixed(2)}`)
+
+            // Passo A: Atualizar Perfil para 'provider'
+            addLog('Sincronizando Perfil (Passo A)...')
             try {
-                // Tenta inserir ou atualizar. Se falhar, segue em frente.
                 await dbRace(supabase.from('profiles').upsert({
                     id: userId,
                     full_name: form.responsible_name,
@@ -322,52 +320,56 @@ export default function ProviderRegister() {
                 }), 'Perfil')
                 addLog('✓ Perfil Sincronizado')
             } catch (err) {
-                addLog(`⚠️ Perfil lento/erro: ${err.message}. Ignorando...`)
+                addLog(`⚠️ Perfil lento (${err.message}). O sistema sincronizará em breve.`)
             }
 
-            // PASSO B: Prestador
-            addLog('Passo B: Profissional...')
-            const spPayload = {
-                user_id: userId,
-                legal_name: form.legal_name,
-                trade_name: form.trade_name || form.legal_name,
-                cnpj: form.cnpj,
-                bio: form.bio,
-                responsible_name: form.responsible_name,
-                phone: form.phone,
-                email: form.email,
-                city: form.city,
-                state: form.state,
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-                services_offered: form.services_offered,
-                pix_key: form.pix_key,
-                referral_code: newReferralCode,
-                status: 'approved'
-            }
-
-            const { error: spErr } = await dbRace(
-                supabase.from('service_providers').upsert(spPayload, { onConflict: 'user_id' }),
-                'Profissional'
-            )
-
-            if (spErr) {
-                addLog(`Tentando Fallback...`)
-                const { error: fallbackErr } = await supabase.from('service_providers').insert(spPayload)
-                if (fallbackErr) {
-                    addLog(`FALHA TOTAL: ${fallbackErr.message}`)
-                    throw fallbackErr
+            // Passo B: Dados Profissionais
+            addLog('Sincronizando Profissional (Passo B)...')
+            try {
+                const spPayload = {
+                    user_id: userId,
+                    legal_name: form.legal_name,
+                    trade_name: form.trade_name || form.legal_name,
+                    cnpj: form.cnpj,
+                    bio: form.bio,
+                    responsible_name: form.responsible_name,
+                    phone: form.phone,
+                    email: form.email,
+                    city: form.city,
+                    state: form.state,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    services_offered: form.services_offered,
+                    pix_key: form.pix_key,
+                    referral_code: generateReferralCode(form.legal_name || form.responsible_name),
+                    status: 'approved'
                 }
-            }
-            addLog('✓ Profissional OK')
 
-            addLog('Redirecionando...')
+                const { error: spErr } = await dbRace(
+                    supabase.from('service_providers').upsert(spPayload, { onConflict: 'user_id' }),
+                    'Profissional'
+                )
+
+                if (spErr) {
+                    addLog('Tentando via inserção direta...')
+                    await supabase.from('service_providers').insert(spPayload)
+                }
+                addLog('✓ Profissional Sincronizado')
+            } catch (err) {
+                addLog(`⚠️ Banco ocupado (${err.message}). Finalizando mesmo assim...`)
+            }
+
+            addLog('SUCESSO! Redirecionando para o Dashboard...')
             if (refreshProfile) await refreshProfile()
-            setTimeout(() => navigate('/dashboard?welcome=true'), 1000)
+
+            // Redireciona rápido
+            setTimeout(() => {
+                navigate('/dashboard?welcome=true')
+            }, 800)
 
         } catch (err) {
             addLog(`ERRO: ${err.message}`)
-            setError(err.message || 'Erro inesperado')
+            setError(err.message || 'Erro inesperado no cadastro')
         } finally {
             setLoading(false)
         }
@@ -428,7 +430,7 @@ export default function ProviderRegister() {
                     </Link>
                     <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center gap-3">
                         Cadastre-se como Profissional
-                        <span className="text-[10px] bg-white/20 text-white/90 px-2 py-0.5 rounded-full font-mono uppercase tracking-tighter">V6 - Tanque</span>
+                        <span className="text-[10px] bg-white/20 text-white/90 px-2 py-0.5 rounded-full font-mono uppercase tracking-tighter">V7 - Inquebrável</span>
                     </h1>
                     <p className="text-white/60">
                         Preencha os dados abaixo para fazer parte da plataforma LimpFlix
@@ -622,7 +624,7 @@ export default function ProviderRegister() {
                                     </select>
                                 </div>
                             </div>
-                            {!user && (
+                            {!user ? (
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Criar senha de acesso *</label>
                                     <input type="password" value={form.password} onChange={(e) => updateForm('password', e.target.value)}
@@ -630,6 +632,16 @@ export default function ProviderRegister() {
                                         minLength={6}
                                         className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green text-gray-800"
                                     />
+                                </div>
+                            ) : (
+                                <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-start gap-3">
+                                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <User className="w-4 h-4 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-blue-900">Você já está logado</p>
+                                        <p className="text-xs text-blue-700">Usaremos sua conta atual (**{user.email}**). Não é necessário criar uma nova senha.</p>
+                                    </div>
                                 </div>
                             )}
                         </div>

@@ -46,21 +46,21 @@ export function AuthProvider({ children }) {
 
     async function loadProfile(userId) {
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single()
+            // Corrige o problema de trava no carregamento inicial (Timeout de 3s)
+            const { data, error } = await Promise.race([
+                supabase.from('profiles').select('*').eq('id', userId).single(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout carregando perfil')), 3000))
+            ])
 
             if (error) {
-                console.warn('Profile not found, creating default client profile...')
-                // No dual role system, we can be proactive here or just set null
+                console.warn('Erro ao carregar perfil:', error.message)
                 setProfile(null)
             } else {
                 setProfile(data)
             }
         } catch (err) {
-            console.error('Error loading profile:', err)
+            console.error('Falha crítica no loadProfile:', err.message)
+            setProfile(null)
         } finally {
             setLoading(false)
         }
