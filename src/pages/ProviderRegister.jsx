@@ -291,48 +291,69 @@ export default function ProviderRegister() {
             // 5. Gerar código de indicação único para o novo prestador
             const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
 
-            setRegistrationStatus('Finalizando e salvando no banco de dados...')
-            console.log("Chamando RPC register_provider_v3 para user_id:", userId)
+            setRegistrationStatus('Salvando perfil...')
+            window.alert('PASSO 2.1: Fotos e Localização processadas. Salvando perfil agora...')
 
-            const { error: rpcError } = await supabase.rpc('register_provider_v3', {
-                p_user_id: userId,
-                p_legal_name: form.legal_name,
-                p_trade_name: form.trade_name || form.legal_name,
-                p_cnpj: form.cnpj,
-                p_bio: form.bio,
-                p_responsible_name: form.responsible_name,
-                p_phone: form.phone,
-                p_email: form.email,
-                p_address: form.address,
-                p_city: form.city,
-                p_state: form.state,
-                p_latitude: coords.latitude,
-                p_longitude: coords.longitude,
-                p_services_offered: form.services_offered,
-                p_profile_image: profileUrl,
-                p_logo_image: logoUrl,
-                p_portfolio_images: portfolioUrls,
-                p_pix_key: form.pix_key,
-                p_referral_code: newReferralCode,
-                p_referrer_id: referrerId
-            })
+            // 6. Save Profile directly
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: userId,
+                    full_name: form.responsible_name,
+                    role: 'provider'
+                })
 
-            if (rpcError) {
-                console.error("Erro no RPC v3:", rpcError)
-                throw rpcError
+            if (profileError) {
+                console.error("Erro ao salvar perfil:", profileError)
+                throw new Error(`Erro ao salvar perfil: ${profileError.message}`)
             }
 
-            window.alert('PASSO 3: Banco de dados (RPC) respondeu com sucesso!')
+            setRegistrationStatus('Salvando dados do prestador...')
+            window.alert('PASSO 2.2: Perfil salvo. Salvando dados profissionais...')
 
+            // 7. Save Provider directly 
+            const { error: providerError } = await supabase
+                .from('service_providers')
+                .upsert({
+                    user_id: userId,
+                    legal_name: form.legal_name,
+                    trade_name: form.trade_name || form.legal_name,
+                    cnpj: form.cnpj,
+                    bio: form.bio,
+                    responsible_name: form.responsible_name,
+                    phone: form.phone,
+                    email: form.email,
+                    address: form.address,
+                    city: form.city,
+                    state: form.state,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    services_offered: form.services_offered,
+                    profile_image: profileUrl,
+                    logo_image: logoUrl,
+                    portfolio_images: portfolioUrls,
+                    pix_key: form.pix_key,
+                    referral_code: newReferralCode,
+                    referrer_id: referrerId,
+                    status: 'approved'
+                }, {
+                    onConflict: 'user_id'
+                })
+
+            if (providerError) {
+                console.error("Erro ao salvar prestador:", providerError)
+                throw new Error(`Erro ao salvar prestador: ${providerError.message}`)
+            }
+
+            window.alert('PASSO 3: Tudo salvo com sucesso! Redirecionando...')
             setRegistrationStatus('Pronto! Redirecionando...')
-            // ProviderRegister.jsx: Chamada de refreshProfile após sucesso
+
             try {
                 if (refreshProfile) await refreshProfile()
-            } catch (pErr) {
-                console.warn("Profile refresh failed, but proceeding to dashboard:", pErr)
+            } catch (err) {
+                console.warn("Profile refresh failed, but proceeding:", err)
             }
 
-            window.alert('PASSO 4: Cadastro concluído! Redirecionando agora...')
             navigate('/dashboard?welcome=true')
         } catch (err) {
             console.error('Registration error detail:', err)
