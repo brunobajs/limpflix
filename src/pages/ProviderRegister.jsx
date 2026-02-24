@@ -270,11 +270,9 @@ export default function ProviderRegister() {
         setError('')
         setLoading(true)
         setDebugLog([])
-        addLog('Iniciando cadastro (Modo Diagnóstico)...')
+        addLog('Iniciando cadastro (Modo Resiliência V5) 🛡️')
 
         try {
-            addLog('MODO ULTRA RAPIDO V4 ATIVO 🚀')
-
             // 1. Auth/User ID
             let userId = user?.id
             if (userId) addLog(`Usuário logado: ${userId.slice(0, 8)}...`)
@@ -299,76 +297,101 @@ export default function ProviderRegister() {
 
             if (!userId) throw new Error('Falha ao obter ID do usuário.')
 
-            // Pequeno delay para garantir que o Supabase processou o novo usuário
-            addLog('Aguardando sincronia interna (1s)...')
-            await new Promise(r => setTimeout(r, 1000))
+            // Pequeno delay para o Supabase (500ms)
+            await new Promise(r => setTimeout(r, 500))
 
             // 2. Localização (Timeout na função já existe)
             addLog('Buscando coordenadas...')
             const coords = await getCoordinates()
             addLog(`Localização OK (${coords.latitude.toFixed(2)})`)
 
-            // 3. Salvar no Banco (SEM IMAGENS - Foco em Velocidade)
-            addLog('Salvando dados no sistema...')
+            // 3. Salvar no Banco
+            addLog('Iniciando sincronia com o banco...')
             const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
 
             // Função helper para timeout no DB
-            const dbRace = (promise) => Promise.race([
+            const dbRace = (promise, name) => Promise.race([
                 promise,
-                new Promise((_, rej) => setTimeout(() => rej(new Error('Sincronização lenta (Timeout 10s)')), 10000))
+                new Promise((_, rej) => setTimeout(() => {
+                    console.warn(`Timeout em ${name}`)
+                    rej(new Error(`Servidor ocupado (${name} 10s)`))
+                }, 10000))
             ])
 
-            addLog('Sincronizando perfil...')
-            const profilePayload = {
-                id: userId,
-                full_name: form.responsible_name,
-                role: 'provider'
-            }
-            addLog(`Payload Perfil: ${JSON.stringify(profilePayload).slice(0, 50)}...`)
-
+            // Passo A: Perfil
+            addLog('Passo A: Perfil...')
             try {
-                await dbRace(supabase.from('profiles').upsert(profilePayload))
-                addLog('✓ Perfil sincronizado')
+                const profilePayload = { id: userId, full_name: form.responsible_name, role: 'provider' }
+                await dbRace(supabase.from('profiles').upsert(profilePayload), 'Perfil')
+                addLog('✓ Perfil OK')
             } catch (err) {
-                addLog(`Aviso Perfil: ${err.message}. Continuando...`)
+                addLog(`⚠️ Perfil lento: ${err.message}. Continuando...`)
             }
 
-            addLog('Finalizando dados profissionais...')
-            const { error: spErr } = await dbRace(supabase.from('service_providers').upsert({
-                user_id: userId,
-                legal_name: form.legal_name,
-                trade_name: form.trade_name || form.legal_name,
-                cnpj: form.cnpj,
-                bio: form.bio,
-                responsible_name: form.responsible_name,
-                phone: form.phone,
-                email: form.email,
-                address: form.address,
-                city: form.city,
-                state: form.state,
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-                services_offered: form.services_offered,
-                // Imagens removidas do cadastro inicial para evitar travamentos
-                profile_image: null,
-                logo_image: null,
-                portfolio_images: [],
-                pix_key: form.pix_key,
-                referral_code: newReferralCode,
-                status: 'approved'
-            }, { onConflict: 'user_id' }))
+            // Passo B: Dados Profissionais
+            addLog('Passo B: Profissional...')
+            try {
+                const spPayload = {
+                    user_id: userId,
+                    legal_name: form.legal_name,
+                    trade_name: form.trade_name || form.legal_name,
+                    cnpj: form.cnpj,
+                    bio: form.bio,
+                    responsible_name: form.responsible_name,
+                    phone: form.phone,
+                    email: form.email,
+                    address: form.address,
+                    city: form.city,
+                    state: form.state,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    services_offered: form.services_offered,
+                    profile_image: null,
+                    logo_image: null,
+                    portfolio_images: [],
+                    pix_key: form.pix_key,
+                    referral_code: newReferralCode,
+                    status: 'approved'
+                }
 
-            if (spErr) {
-                addLog(`ERRO BANCO: ${spErr.message}`)
-                throw spErr
+                const { error: spErr } = await dbRace(
+                    supabase.from('service_providers').upsert(spPayload, { onConflict: 'user_id' }),
+                    'Profissional'
+                )
+
+                if (spErr) {
+                    addLog(`ERRO BANCO: ${spErr.message}`)
+                    throw spErr
+                }
+                addLog('✓ Profissional OK')
+            } catch (err) {
+                // Se falhar o passo B, tentamos um 'INSERT' simples como fallback caso o upsert falhe por conflito de constraint
+                addLog('Tentando via Fallback (Insert)...')
+                const { error: fallbackErr } = await supabase.from('service_providers').insert({
+                    user_id: userId,
+                    legal_name: form.legal_name,
+                    trade_name: form.trade_name || form.legal_name,
+                    cnpj: form.cnpj,
+                    responsible_name: form.responsible_name,
+                    city: form.city,
+                    state: form.state,
+                    services_offered: form.services_offered,
+                    status: 'approved'
+                })
+
+                if (fallbackErr) {
+                    addLog(`FALHA TOTAL: ${err.message}`)
+                    throw err
+                }
+                addLog('✓ Fallback OK')
             }
 
-            addLog('Pronto! Redirecionando para o painel...')
+            addLog('Sucesso! Redirecionando...')
             if (refreshProfile) await refreshProfile()
-            navigate('/dashboard?welcome=true')
+            setTimeout(() => navigate('/dashboard?welcome=true'), 1500)
 
         } catch (err) {
-            addLog(`FALHA: ${err.message}`)
+            addLog(`ERRO CRÍTICO: ${err.message}`)
             console.error('Registration failed:', err)
             setError(err.message || 'Erro inesperado')
         } finally {
@@ -431,7 +454,7 @@ export default function ProviderRegister() {
                     </Link>
                     <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center gap-3">
                         Cadastre-se como Profissional
-                        <span className="text-[10px] bg-white/20 text-white/90 px-2 py-0.5 rounded-full font-mono uppercase tracking-tighter">V4 - Turbo</span>
+                        <span className="text-[10px] bg-white/20 text-white/90 px-2 py-0.5 rounded-full font-mono uppercase tracking-tighter">V5 - Blindado</span>
                     </h1>
                     <p className="text-white/60">
                         Preencha os dados abaixo para fazer parte da plataforma LimpFlix
