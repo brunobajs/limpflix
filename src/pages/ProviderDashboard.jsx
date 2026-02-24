@@ -205,15 +205,15 @@ export default function ProviderDashboard() {
         }
 
         try {
-            const { data: providerData, error: providerError } = await supabase
+            const { data: providers, error: providerError } = await supabase
                 .from('service_providers')
                 .select('*')
                 .eq('user_id', user.id)
-                .single()
+                .limit(1)
 
-            if (providerError && providerError.code !== 'PGRST116') {
-                throw providerError
-            }
+            if (providerError) throw providerError
+
+            const providerData = providers?.[0] || null
 
             console.log("Dashboard Debug - User ID:", user.id)
             console.log("Dashboard Debug - Provider Data found:", providerData)
