@@ -149,47 +149,50 @@ export default function ProviderRegister() {
         }))
     }
 
-    // Função par comprimir imagem no cliente (Canvas)
+    // Função par comprimir imagem no cliente (Canvas) com escape de 5s
     const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
+            // Timeout de escape: se demorar demais, manda o original
+            const escapeTimer = setTimeout(() => {
+                console.warn("Compression escape triggered")
+                resolve(file)
+            }, 5000)
+
             const reader = new FileReader()
             reader.readAsDataURL(file)
-            reader.onerror = () => reject(new Error('Erro ao ler arquivo da imagem'))
+            reader.onerror = () => { clearTimeout(escapeTimer); resolve(file) }
             reader.onload = (event) => {
                 const img = new Image()
-                img.src = event.target.result
-                img.onerror = () => reject(new Error('Erro ao carregar objeto de imagem'))
+                img.onerror = () => { clearTimeout(escapeTimer); resolve(file) }
                 img.onload = () => {
-                    const canvas = document.createElement('canvas')
-                    let width = img.width
-                    let height = img.height
+                    try {
+                        const canvas = document.createElement('canvas')
+                        let width = img.width
+                        let height = img.height
 
-                    if (width > maxWidth) {
-                        height = (maxWidth / width) * height
-                        width = maxWidth
-                    }
-
-                    canvas.width = width
-                    canvas.height = height
-                    const ctx = canvas.getContext('2d')
-                    if (!ctx) {
-                        reject(new Error('Canvas context failed'))
-                        return
-                    }
-                    ctx.drawImage(img, 0, 0, width, height)
-
-                    canvas.toBlob((blob) => {
-                        if (!blob) {
-                            reject(new Error('Blob conversion failed'))
-                            return
+                        if (width > maxWidth) {
+                            height = (maxWidth / width) * height
+                            width = maxWidth
                         }
-                        const compressedFile = new File([blob], file.name, {
-                            type: 'image/jpeg',
-                            lastModified: Date.now(),
-                        })
-                        resolve(compressedFile)
-                    }, 'image/jpeg', quality)
+
+                        canvas.width = width
+                        canvas.height = height
+                        const ctx = canvas.getContext('2d')
+                        if (!ctx) { clearTimeout(escapeTimer); resolve(file); return }
+                        ctx.drawImage(img, 0, 0, width, height)
+
+                        canvas.toBlob((blob) => {
+                            clearTimeout(escapeTimer)
+                            if (!blob) { resolve(file); return }
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            })
+                            resolve(compressedFile)
+                        }, 'image/jpeg', quality)
+                    } catch (e) { clearTimeout(escapeTimer); resolve(file) }
                 }
+                img.src = event.target.result
             }
         })
     }
@@ -231,19 +234,23 @@ export default function ProviderRegister() {
         if (!file) return null
 
         try {
-            // Comprimir antes de enviar
-            const compressed = (file instanceof File) ? await compressImage(file) : file
-            if (!(compressed instanceof File)) return file
+            // Tenta comprimir com escape de 5s
+            const toUpload = (file instanceof File) ? await compressImage(file) : file
 
-            const fileExt = compressed.name.split('.').pop()
+            const fileExt = (toUpload.name || 'img.jpg').split('.').pop()
             const fileName = `${Math.random()}.${fileExt}`
             const filePath = `${folder}/${fileName}`
 
-            console.log(`Uploading ${filePath}...`)
-
-            const { error: uploadError } = await supabase.storage
+            // Timeout de 20s para o upload no Supabase
+            const uploadTask = supabase.storage
                 .from('providers-media')
-                .upload(filePath, compressed)
+                .upload(filePath, toUpload)
+
+            const timeoutPromise = new Promise((_, rej) =>
+                setTimeout(() => rej(new Error('Link de upload expirou (20s)')), 20000)
+            )
+
+            const { error: uploadError } = await Promise.race([uploadTask, timeoutPromise])
 
             if (uploadError) throw uploadError
 
@@ -253,7 +260,8 @@ export default function ProviderRegister() {
 
             return data.publicUrl
         } catch (err) {
-            console.error('Upload fail:', err)
+            console.error('Upload process failed:', err)
+            addLog(`Aviso: Falha no envio (${err.message}). Continuando...`)
             return null
         }
     }
