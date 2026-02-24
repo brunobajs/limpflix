@@ -273,6 +273,8 @@ export default function ProviderRegister() {
         addLog('Iniciando cadastro (Modo Diagnóstico)...')
 
         try {
+            addLog('MODO ULTRA RAPIDO V4 ATIVO 🚀')
+
             // 1. Auth/User ID
             let userId = user?.id
             if (userId) addLog(`Usuário logado: ${userId.slice(0, 8)}...`)
@@ -297,30 +299,16 @@ export default function ProviderRegister() {
 
             if (!userId) throw new Error('Falha ao obter ID do usuário.')
 
+            // Pequeno delay para garantir que o Supabase processou o novo usuário
+            addLog('Aguardando sincronia interna (1s)...')
+            await new Promise(r => setTimeout(r, 1000))
+
             // 2. Localização (Timeout na função já existe)
             addLog('Buscando coordenadas...')
             const coords = await getCoordinates()
             addLog(`Localização OK (${coords.latitude.toFixed(2)})`)
 
-            // 3. Imagens (SEQUENCIAL para depuração visual)
-            addLog('Processando foto de perfil...')
-            const profileUrl = await uploadMedia(form.profile_image, 'profiles')
-            addLog('Foto perfil OK')
-
-            addLog('Processando logotipo...')
-            const logoUrl = await uploadMedia(form.logo_image, 'logos')
-            addLog('Logotipo OK')
-
-            addLog(`Processando ${form.portfolio_images.length} fotos portfólio...`)
-            const portfolioUrls = []
-            for (let i = 0; i < form.portfolio_images.length; i++) {
-                addLog(`Enviando foto ${i + 1}/${form.portfolio_images.length}...`)
-                const url = await uploadMedia(form.portfolio_images[i], 'portfolio')
-                portfolioUrls.push(url)
-            }
-            addLog('Portfólio COMPLETO')
-
-            // 4. Salvar no Banco
+            // 3. Salvar no Banco (SEM IMAGENS - Foco em Velocidade)
             addLog('Salvando dados no sistema...')
             const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
 
@@ -331,12 +319,16 @@ export default function ProviderRegister() {
             ])
 
             addLog('Sincronizando perfil...')
+            const profilePayload = {
+                id: userId,
+                full_name: form.responsible_name,
+                role: 'provider'
+            }
+            addLog(`Payload Perfil: ${JSON.stringify(profilePayload).slice(0, 50)}...`)
+
             try {
-                await dbRace(supabase.from('profiles').upsert({
-                    id: userId,
-                    full_name: form.responsible_name,
-                    role: 'provider'
-                }))
+                await dbRace(supabase.from('profiles').upsert(profilePayload))
+                addLog('✓ Perfil sincronizado')
             } catch (err) {
                 addLog(`Aviso Perfil: ${err.message}. Continuando...`)
             }
@@ -357,9 +349,10 @@ export default function ProviderRegister() {
                 latitude: coords.latitude,
                 longitude: coords.longitude,
                 services_offered: form.services_offered,
-                profile_image: profileUrl,
-                logo_image: logoUrl,
-                portfolio_images: (portfolioUrls || []).filter(u => u !== null),
+                // Imagens removidas do cadastro inicial para evitar travamentos
+                profile_image: null,
+                logo_image: null,
+                portfolio_images: [],
                 pix_key: form.pix_key,
                 referral_code: newReferralCode,
                 status: 'approved'
@@ -401,7 +394,7 @@ export default function ProviderRegister() {
             case 3:
                 if (form.services_offered.length === 0) return 'Selecione pelo menos um serviço'
                 return null
-            case 5:
+            case 4:
                 if (!acceptedTerms) return 'Você precisa aceitar os Termos de Responsabilidade para finalizar o cadastro.'
                 return null
             default:
@@ -416,7 +409,7 @@ export default function ProviderRegister() {
             return
         }
         setError('')
-        if (step < 5) setStep(step + 1)
+        if (step < 4) setStep(step + 1)
         else handleSubmit()
     }
 
@@ -424,8 +417,7 @@ export default function ProviderRegister() {
         { num: 1, label: 'Empresa', icon: Building2 },
         { num: 2, label: 'Contato', icon: User },
         { num: 3, label: 'Serviços', icon: Wrench },
-        { num: 4, label: 'Fotos', icon: Camera },
-        { num: 5, label: 'Pagamento', icon: CreditCard },
+        { num: 4, label: 'Finalizar', icon: CreditCard },
     ]
 
     return (
@@ -437,8 +429,9 @@ export default function ProviderRegister() {
                         <ArrowLeft className="w-4 h-4" />
                         Voltar
                     </Link>
-                    <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                    <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center gap-3">
                         Cadastre-se como Profissional
+                        <span className="text-[10px] bg-white/20 text-white/90 px-2 py-0.5 rounded-full font-mono uppercase tracking-tighter">V4 - Turbo</span>
                     </h1>
                     <p className="text-white/60">
                         Preencha os dados abaixo para fazer parte da plataforma LimpFlix
@@ -677,113 +670,8 @@ export default function ProviderRegister() {
                         </div>
                     )}
 
-                    {/* Step 4 - Media */}
+                    {/* Step 4 - Payment */}
                     {step === 4 && (
-                        <div className="space-y-6 animate-fade-in">
-                            <h2 className="text-lg font-bold text-gray-900 mb-1">Fotos e Portfólio</h2>
-                            <p className="text-gray-500 text-sm mb-6">Destaque seu perfil com imagens reais (Opcional)</p>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                {/* Profile Photo */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Foto de Perfil</label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
-                                            {form.profile_image ? (
-                                                <img src={typeof form.profile_image === 'string' ? form.profile_image : URL.createObjectURL(form.profile_image)} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <User className="w-8 h-8 text-gray-400" />
-                                            )}
-                                        </div>
-                                        <input
-                                            type="file"
-                                            id="profile-upload"
-                                            className="hidden"
-                                            accept="image/*"
-                                            onChange={(e) => updateForm('profile_image', e.target.files[0])}
-                                        />
-                                        <label htmlFor="profile-upload" className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors">
-                                            Alterar
-                                        </label>
-                                    </div>
-                                </div>
-
-                                {/* Logo */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Logotipo da Empresa</label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
-                                            {form.logo_image ? (
-                                                <img src={typeof form.logo_image === 'string' ? form.logo_image : URL.createObjectURL(form.logo_image)} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <Building2 className="w-8 h-8 text-gray-400" />
-                                            )}
-                                        </div>
-                                        <input
-                                            type="file"
-                                            id="logo-upload"
-                                            className="hidden"
-                                            accept="image/*"
-                                            onChange={(e) => updateForm('logo_image', e.target.files[0])}
-                                        />
-                                        <label htmlFor="logo-upload" className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors">
-                                            Alterar
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Portfolio */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Portfólio (Fotos de outros trabalhos)</label>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                                    {form.portfolio_images.map((img, idx) => (
-                                        <div key={idx} className="aspect-square bg-gray-100 rounded-xl relative group overflow-hidden">
-                                            <img src={typeof img === 'string' ? img : URL.createObjectURL(img)} className="w-full h-full object-cover" />
-                                            <button
-                                                onClick={() => setForm(prev => ({ ...prev, portfolio_images: prev.portfolio_images.filter((_, i) => i !== idx) }))}
-                                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <input
-                                        type="file"
-                                        id="portfolio-upload"
-                                        className="hidden"
-                                        multiple
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            const files = Array.from(e.target.files)
-                                            setForm(prev => ({ ...prev, portfolio_images: [...prev.portfolio_images, ...files] }))
-                                        }}
-                                    />
-                                    <label htmlFor="portfolio-upload" className="aspect-square bg-gray-50 hover:bg-gray-100 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all gap-1">
-                                        <Plus className="w-6 h-6 text-gray-400" />
-                                        <span className="text-[10px] text-gray-500 font-medium">Adicionar</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Skip Hint */}
-                            <div className="bg-green/5 border border-green/10 rounded-xl p-4 mt-6 flex items-center justify-between">
-                                <span className="text-sm text-green/70">
-                                    <strong>Dica:</strong> Você pode pular as fotos agora e completá-las depois.
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => nextStep()}
-                                    className="text-green font-bold text-sm hover:underline flex items-center gap-1"
-                                >
-                                    Pular por enquanto <ChevronRight className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 5 - Payment */}
-                    {step === 5 && (
                         <div className="space-y-5 animate-fade-in">
                             <h2 className="text-lg font-bold text-gray-900 mb-1">Dados de Pagamento</h2>
                             <p className="text-gray-500 text-sm mb-4">Informações para receber seus pagamentos</p>
@@ -865,7 +753,7 @@ export default function ProviderRegister() {
                                     </div>
                                     {registrationStatus && <span className="text-[10px] font-normal opacity-80">{registrationStatus}</span>}
                                 </>
-                            ) : step === 5 ? (
+                            ) : step === 4 ? (
                                 <div className="flex items-center gap-2">
                                     Finalizar Cadastro
                                     <CheckCircle2 className="w-5 h-5" />

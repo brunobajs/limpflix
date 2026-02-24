@@ -8,7 +8,7 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle, GraduationCap, Gift
+    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
 import ChatWindow from '../components/ChatWindow'
@@ -131,6 +131,70 @@ export default function ProviderDashboard() {
             osc.stop(audioCtx.currentTime + 0.5)
         } catch (e) {
             console.error('Audio alert failed:', e)
+        }
+    }
+
+    const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
+        return new Promise((resolve) => {
+            const escapeTimer = setTimeout(() => {
+                console.warn("Compression escape triggered")
+                resolve(file)
+            }, 5000)
+
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+            reader.onerror = () => { clearTimeout(escapeTimer); resolve(file) }
+            reader.onload = (event) => {
+                const img = new Image()
+                img.onerror = () => { clearTimeout(escapeTimer); resolve(file) }
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas')
+                        let width = img.width
+                        let height = img.height
+                        if (width > maxWidth) {
+                            height = (maxWidth / width) * height
+                            width = maxWidth
+                        }
+                        canvas.width = width
+                        canvas.height = height
+                        const ctx = canvas.getContext('2d')
+                        if (!ctx) { clearTimeout(escapeTimer); resolve(file); return }
+                        ctx.drawImage(img, 0, 0, width, height)
+                        canvas.toBlob((blob) => {
+                            clearTimeout(escapeTimer)
+                            if (!blob) { resolve(file); return }
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            })
+                            resolve(compressedFile)
+                        }, 'image/jpeg', quality)
+                    } catch (e) { clearTimeout(escapeTimer); resolve(file) }
+                }
+                img.src = event.target.result
+            }
+        })
+    }
+
+    async function uploadMedia(file, folder) {
+        if (!file || typeof file === 'string') return file
+        try {
+            const toUpload = await compressImage(file)
+            const fileExt = (toUpload.name || 'img.jpg').split('.').pop()
+            const fileName = `${Math.random()}.${fileExt}`
+            const filePath = `${folder}/${fileName}`
+            const { error: uploadError } = await supabase.storage
+                .from('providers-media')
+                .upload(filePath, toUpload)
+            if (uploadError) throw uploadError
+            const { data } = supabase.storage
+                .from('providers-media')
+                .getPublicUrl(filePath)
+            return data.publicUrl
+        } catch (err) {
+            console.error('Upload failed:', err)
+            return null
         }
     }
 
@@ -290,6 +354,15 @@ export default function ProviderDashboard() {
     async function handleSaveSettings() {
         setIsSaving(true)
         try {
+            // Upload de fotos se houver novas
+            const profileUrl = editForm.profile_image_file
+                ? await uploadMedia(editForm.profile_image_file, 'profiles')
+                : editForm.profile_image
+
+            const logoUrl = editForm.logo_image_file
+                ? await uploadMedia(editForm.logo_image_file, 'logos')
+                : editForm.logo_image
+
             const { error } = await supabase
                 .from('service_providers')
                 .update({
@@ -300,13 +373,15 @@ export default function ProviderDashboard() {
                     city: editForm.city,
                     state: editForm.state,
                     services_offered: editForm.services_offered,
+                    profile_image: profileUrl,
+                    logo_image: logoUrl,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', provider.id)
 
             if (error) throw error
 
-            setProvider({ ...provider, ...editForm })
+            setProvider({ ...provider, ...editForm, profile_image: profileUrl, logo_image: logoUrl })
             setIsEditing(false)
             alert('Perfil atualizado com sucesso!')
         } catch (err) {
@@ -537,6 +612,27 @@ export default function ProviderDashboard() {
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                     <div className="space-y-6 animate-fade-in">
+                        {/* Missing Photos Alert */}
+                        {(!provider.profile_image || !provider.logo_image) && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <Camera className="w-6 h-6 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-amber-900">Complete seu Perfil! 🎉</h3>
+                                        <p className="text-sm text-amber-700">Adicione uma foto de perfil e logotipo para transmitir mais confiança e atrair 5x mais clientes.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setActiveTab('settings')}
+                                    className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md shadow-amber-600/20 whitespace-nowrap"
+                                >
+                                    Adicionar Fotos
+                                </button>
+                            </div>
+                        )}
+
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             {stats.map((stat, i) => (
@@ -851,110 +947,173 @@ export default function ProviderDashboard() {
                             )}
                         </div>
 
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome Fantasia / Empresa</label>
-                                    <div className="relative">
-                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            disabled={!isEditing}
-                                            value={editForm.trade_name || ''}
-                                            onChange={e => setEditForm({ ...editForm, trade_name: e.target.value })}
-                                            className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
-                                        />
+                        <div className="space-y-8">
+                            {/* Photos Section */}
+                            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                    <Camera className="w-5 h-5 text-green" />
+                                    Fotos do Perfil
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Foto de Perfil</p>
+                                        <div className="relative group">
+                                            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-gray-200 flex items-center justify-center">
+                                                {editForm.profile_image_file ? (
+                                                    <img src={URL.createObjectURL(editForm.profile_image_file)} className="w-full h-full object-cover" />
+                                                ) : editForm.profile_image ? (
+                                                    <img src={editForm.profile_image} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <User className="w-12 h-12 text-gray-400" />
+                                                )}
+                                            </div>
+                                            {isEditing && (
+                                                <label className="absolute bottom-0 right-0 bg-green text-white p-2 rounded-full cursor-pointer shadow-lg hover:bg-green-dark transition-all">
+                                                    <Camera className="w-5 h-5" />
+                                                    <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        onChange={e => setEditForm({ ...editForm, profile_image_file: e.target.files[0] })}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefone / WhatsApp</label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            disabled={!isEditing}
-                                            value={editForm.phone || ''}
-                                            onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                                            className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Sobre</label>
-                                    <textarea
-                                        disabled={!isEditing}
-                                        value={editForm.bio || ''}
-                                        onChange={e => setEditForm({ ...editForm, bio: e.target.value })}
-                                        rows={4}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all resize-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Chave PIX (Para Recebimento Automático)</label>
-                                    <input
-                                        type="text"
-                                        disabled={!isEditing}
-                                        value={editForm.pix_key || ''}
-                                        onChange={e => setEditForm({ ...editForm, pix_key: e.target.value })}
-                                        placeholder="CPF, E-mail ou Celular"
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
-                                    />
-                                    <p className="text-[10px] text-gray-400 mt-1">*O valor será transferido para esta chave assim que o pagamento for confirmado.</p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-                                        <input
-                                            type="text"
-                                            disabled={!isEditing}
-                                            value={editForm.city || ''}
-                                            onChange={e => setEditForm({ ...editForm, city: e.target.value })}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                                        <select
-                                            disabled={!isEditing}
-                                            value={editForm.state || ''}
-                                            onChange={e => setEditForm({ ...editForm, state: e.target.value })}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
-                                        >
-                                            {STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
+
+                                    <div className="flex flex-col items-center gap-3">
+                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Logotipo</p>
+                                        <div className="relative group">
+                                            <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-white shadow-lg bg-gray-200 flex items-center justify-center">
+                                                {editForm.logo_image_file ? (
+                                                    <img src={URL.createObjectURL(editForm.logo_image_file)} className="w-full h-full object-cover" />
+                                                ) : editForm.logo_image ? (
+                                                    <img src={editForm.logo_image} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Building2 className="w-12 h-12 text-gray-400" />
+                                                )}
+                                            </div>
+                                            {isEditing && (
+                                                <label className="absolute bottom-0 right-0 bg-navy text-white p-2 rounded-full cursor-pointer shadow-lg hover:bg-navy-light transition-all">
+                                                    <Image className="w-5 h-5" />
+                                                    <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        onChange={e => setEditForm({ ...editForm, logo_image_file: e.target.files[0] })}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-3">Serviços Oferecidos</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {SERVICE_OPTIONS.map(service => (
-                                        <button
-                                            key={service}
-                                            type="button"
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome Fantasia / Empresa</label>
+                                        <div className="relative">
+                                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                disabled={!isEditing}
+                                                value={editForm.trade_name || ''}
+                                                onChange={e => setEditForm({ ...editForm, trade_name: e.target.value })}
+                                                className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Telefone / WhatsApp</label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                disabled={!isEditing}
+                                                value={editForm.phone || ''}
+                                                onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                                                className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Sobre</label>
+                                        <textarea
                                             disabled={!isEditing}
-                                            onClick={() => toggleService(service)}
-                                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${editForm.services_offered?.includes(service)
-                                                ? 'border-green bg-green/5 text-green'
-                                                : 'border-gray-200 text-gray-700'
-                                                } ${!isEditing ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:border-green/50'}`}
-                                        >
-                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${editForm.services_offered?.includes(service) ? 'bg-green border-green' : 'border-gray-300'
-                                                }`}>
-                                                {editForm.services_offered?.includes(service) && (
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                                                )}
-                                            </div>
-                                            <span className="text-sm font-medium">{service}</span>
-                                        </button>
-                                    ))}
+                                            value={editForm.bio || ''}
+                                            onChange={e => setEditForm({ ...editForm, bio: e.target.value })}
+                                            rows={4}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all resize-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Chave PIX (Para Recebimento Automático)</label>
+                                        <input
+                                            type="text"
+                                            disabled={!isEditing}
+                                            value={editForm.pix_key || ''}
+                                            onChange={e => setEditForm({ ...editForm, pix_key: e.target.value })}
+                                            placeholder="CPF, E-mail ou Celular"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
+                                        />
+                                        <p className="text-[10px] text-gray-400 mt-1">*O valor será transferido para esta chave assim que o pagamento for confirmado.</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                                            <input
+                                                type="text"
+                                                disabled={!isEditing}
+                                                value={editForm.city || ''}
+                                                onChange={e => setEditForm({ ...editForm, city: e.target.value })}
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                                            <select
+                                                disabled={!isEditing}
+                                                value={editForm.state || ''}
+                                                onChange={e => setEditForm({ ...editForm, state: e.target.value })}
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green disabled:bg-gray-50 disabled:text-gray-500 transition-all"
+                                            >
+                                                {STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-3">Serviços Oferecidos</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {SERVICE_OPTIONS.map(service => (
+                                            <button
+                                                key={service}
+                                                type="button"
+                                                disabled={!isEditing}
+                                                onClick={() => toggleService(service)}
+                                                className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${editForm.services_offered?.includes(service)
+                                                    ? 'border-green bg-green/5 text-green'
+                                                    : 'border-gray-200 text-gray-700'
+                                                    } ${!isEditing ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:border-green/50'}`}
+                                            >
+                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${editForm.services_offered?.includes(service) ? 'bg-green border-green' : 'border-gray-300'
+                                                    }`}>
+                                                    {editForm.services_offered?.includes(service) && (
+                                                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                                                    )}
+                                                </div>
+                                                <span className="text-sm font-medium">{service}</span>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 )}
             </div>
-        </div >
+        </div>
     )
 }
