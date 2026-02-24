@@ -24,10 +24,6 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-50 bg-navy/95 backdrop-blur-md shadow-lg">
-            {/* DEBUG BANNER - REMOVE AFTER VERIFICATION */}
-            <div className="bg-red-600 text-white text-[10px] py-1 px-4 text-center font-bold animate-pulse">
-                SISTEMA SINCRONIZADO - V3 - {new Date().toLocaleTimeString()} - SE ESTIVER VENDO ISSO, AS CORREÇÕES ESTÃO ATIVAS
-            </div>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo */}

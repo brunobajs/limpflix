@@ -143,8 +143,8 @@ export default function Home() {
                     <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green/5 rounded-full blur-3xl"></div>
                 </div>
 
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12 md:pt-6 md:pb-16">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
                         <div className="text-left max-w-2xl">
                             <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.1] mb-6 tracking-tight">
                                 Encontre os <br className="hidden md:block" />
@@ -192,7 +192,7 @@ export default function Home() {
 
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
-                            <div className="relative z-10 w-full max-w-[500px] ml-auto">
+                            <div className="relative z-10 w-full max-w-[500px] ml-auto lg:-mt-16">
                                 <div className="absolute inset-0 bg-green/5 blur-3xl"></div>
                                 <div className="relative">
                                     <img
