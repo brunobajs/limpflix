@@ -67,6 +67,7 @@ export default function ProviderRegister() {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const { user, refreshProfile } = useAuth()
+    const [registrationStatus, setRegistrationStatus] = useState('')
 
     const [form, setForm] = useState({
         // Step 1 - Company
@@ -200,12 +201,12 @@ export default function ProviderRegister() {
         setError('')
         setLoading(true)
         try {
-            console.log("Iniciando handleSubmit. Usuário atual da sessão:", user?.id)
-
+            setRegistrationStatus('Iniciando cadastro...')
             // 1. Create auth account if not logged in
             let userId = user?.id
 
             if (!userId) {
+                setRegistrationStatus('Criando sua conta de acesso...')
                 // Tenta criar a conta
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
@@ -237,9 +238,11 @@ export default function ProviderRegister() {
                     throw new Error('Não foi possível criar sua conta de acesso. Tente novamente ou use outro e-mail.')
                 }
 
+                setRegistrationStatus('Sincronizando conta...')
                 // Pequeno delay para garantir que o trigger handle_new_user termine e o banco sincronize
-                console.log("Aguardando sincronização do banco...")
                 await new Promise(resolve => setTimeout(resolve, 1000))
+
+                setRegistrationStatus('Verificando conta no sistema...')
 
                 // Diagnóstico: Verificar se o usuário realmente existe no banco agora
                 const { data: userExists, error: checkError } = await supabase.rpc('check_user_exists', { p_user_id: userId })
@@ -261,7 +264,7 @@ export default function ProviderRegister() {
                 referrerId = referrerData?.id || null
             }
 
-            // 3. Parallelize: Upload images AND get coordinates (Geocoding)
+            setRegistrationStatus('Buscando localização e preparando imagens...')
             console.log("Iniciando processamento paralelo (Uploads + Geo)...")
 
             const uploadProfiles = form.profile_image instanceof File ? uploadMedia(form.profile_image, 'profiles') : Promise.resolve(form.profile_image)
@@ -282,7 +285,7 @@ export default function ProviderRegister() {
             // 5. Gerar código de indicação único para o novo prestador
             const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
 
-            // 6. Save provider to Supabase using RPC v3 (Atômico & Dual Role)
+            setRegistrationStatus('Finalizando e salvando no banco de dados...')
             console.log("Chamando RPC register_provider_v3 para user_id:", userId)
 
             const { error: rpcError } = await supabase.rpc('register_provider_v3', {
@@ -313,6 +316,7 @@ export default function ProviderRegister() {
                 throw rpcError
             }
 
+            setRegistrationStatus('Pronto! Redirecionando...')
             // ProviderRegister.jsx: Chamada de refreshProfile após sucesso
             try {
                 if (refreshProfile) await refreshProfile()
@@ -778,20 +782,26 @@ export default function ProviderRegister() {
                         <button
                             onClick={nextStep}
                             disabled={loading}
-                            className="flex items-center gap-2 bg-green hover:bg-green-dark text-white px-8 py-3 rounded-xl font-semibold transition-all hover:scale-105 disabled:opacity-50 shadow-lg shadow-green/25"
+                            className="flex flex-col items-center justify-center gap-1 bg-green hover:bg-green-dark text-white px-8 py-3 rounded-xl font-semibold transition-all hover:scale-105 disabled:opacity-50 shadow-lg shadow-green/25 min-w-[160px]"
                         >
                             {loading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : step === 5 ? (
                                 <>
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span>Processando...</span>
+                                    </div>
+                                    {registrationStatus && <span className="text-[10px] font-normal opacity-80">{registrationStatus}</span>}
+                                </>
+                            ) : step === 5 ? (
+                                <div className="flex items-center gap-2">
                                     Finalizar Cadastro
                                     <CheckCircle2 className="w-5 h-5" />
-                                </>
+                                </div>
                             ) : (
-                                <>
+                                <div className="flex items-center gap-2">
                                     Próximo
                                     <ChevronRight className="w-5 h-5" />
-                                </>
+                                </div>
                             )}
                         </button>
                     </div>
