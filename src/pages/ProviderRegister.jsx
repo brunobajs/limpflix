@@ -203,163 +203,129 @@ export default function ProviderRegister() {
     async function handleSubmit() {
         setError('')
         setLoading(true)
-        window.alert('PASSO 1: Iniciando envio do formulário...')
+        setRegistrationStatus('Iniciando...')
+        window.alert('PASSO 1: Início (Survival Mode)')
+
         try {
-            setRegistrationStatus('Iniciando cadastro...')
-            // 1. Create auth account if not logged in
+            // 1. Identificar Usuário
             let userId = user?.id
+            window.alert(`PASSO 1.1: ID Atual: ${userId || 'Nenhum'}`)
 
             if (!userId) {
-                setRegistrationStatus('Criando sua conta de acesso...')
-                // Tenta criar a conta
+                window.alert('PASSO 1.2: Tentando Criar Conta (signUp)...')
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
                     password: form.password,
-                    options: {
-                        data: { full_name: form.responsible_name }
-                    }
+                    options: { data: { full_name: form.responsible_name } }
                 })
 
                 if (signUpError) {
-                    // Caso o erro seja de usuário já existente, podemos tentar fazer o login automático
-                    // ou pedir para o usuário logar. Aqui, vamos lançar o erro amigável.
-                    if (signUpError.message.toLowerCase().includes('already registered')) {
-                        throw new Error('Este e-mail já está em uso. Por favor, faça login antes de se cadastrar como profissional.')
-                    }
+                    window.alert(`ERRO no signUp: ${signUpError.message}`)
                     throw signUpError
                 }
-
                 userId = signUpData?.user?.id
-
-                // IMPORTANTE: Alguns provedores do Supabase podem demorar milissegundos para propagar o usuário
-                // Se o userId veio nulo do signUp (raro), tentamos pegar a sessão atual
-                if (!userId) {
-                    const { data: sessionData } = await supabase.auth.getSession()
-                    userId = sessionData?.session?.user?.id
-                }
+                window.alert(`PASSO 1.3: Conta Criada ID: ${userId}`)
 
                 if (!userId) {
-                    throw new Error('Não foi possível criar sua conta de acesso. Tente novamente ou use outro e-mail.')
+                    window.alert('PASSO 1.4: Usuário pendente, buscando sessão...')
+                    const { data: sData } = await supabase.auth.getSession()
+                    userId = sData?.session?.user?.id
                 }
-
-                setRegistrationStatus('Sincronizando conta...')
-                // Pequeno delay para garantir que o trigger handle_new_user termine e o banco sincronize
-                await new Promise(resolve => setTimeout(resolve, 1000))
-
-                setRegistrationStatus('Verificando conta no sistema...')
-
-                // Diagnóstico: Verificar se o usuário realmente existe no banco agora
-                const { data: userExists, error: checkError } = await supabase.rpc('check_user_exists', { p_user_id: userId })
-                console.log("Diagnóstico - Usuário criado existe no banco (auth.users)?", userExists, checkError || "")
-
-                if (checkError) console.warn("Erro ao verificar existência do usuário:", checkError)
-            }
-            // Removido o bloqueio de 'existingProvider' para permitir que qualquer conta (mesmo de cliente) se torne prestador.
-
-
-            // 2. Buscar referrerId pelo código de indicação (se informado)
-            let referrerId = null
-            if (form.referral_code_input.trim()) {
-                const { data: referrerData } = await supabase
-                    .from('service_providers')
-                    .select('id')
-                    .eq('referral_code', form.referral_code_input.trim().toUpperCase())
-                    .single()
-                referrerId = referrerData?.id || null
             }
 
-            setRegistrationStatus('Buscando localização e preparando imagens...')
-            console.log("Iniciando processamento paralelo (Uploads + Geo)...")
+            if (!userId) throw new Error('Não foi possível obter um ID de usuário.')
 
-            const uploadProfiles = form.profile_image instanceof File ? uploadMedia(form.profile_image, 'profiles') : Promise.resolve(form.profile_image)
-            const uploadLogos = form.logo_image instanceof File ? uploadMedia(form.logo_image, 'logos') : Promise.resolve(form.logo_image)
-            const uploadPortfolio = Promise.all(
-                form.portfolio_images.map(item => item instanceof File ? uploadMedia(item, 'portfolio') : Promise.resolve(item))
-            )
-
-            const [profileUrl, logoUrl, portfolioUrls, coords] = await Promise.all([
-                uploadProfiles,
-                uploadLogos,
-                uploadPortfolio,
-                getCoordinates()
-            ])
-
-            window.alert('PASSO 2: Fotos e Localização processadas com sucesso!')
-
-            console.log("Processamento paralelo concluído:", { profileUrl, logoUrl, portfolioCount: portfolioUrls.length, coords })
-
-            // 5. Gerar código de indicação único para o novo prestador
-            const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
-
-            setRegistrationStatus('Salvando perfil...')
-            window.alert('PASSO 2.1: Fotos e Localização processadas. Salvando perfil agora...')
-
-            // 6. Save Profile directly
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .upsert({
-                    id: userId,
-                    full_name: form.responsible_name,
-                    role: 'provider'
-                })
-
-            if (profileError) {
-                console.error("Erro ao salvar perfil:", profileError)
-                throw new Error(`Erro ao salvar perfil: ${profileError.message}`)
+            // 2. Coordenadas (COM TIMEOUT SEVERO)
+            window.alert('PASSO 2: Buscando localização (Timeout 3s)...')
+            let coords = { latitude: -23.5505, longitude: -46.6333 }
+            try {
+                coords = await getCoordinates()
+                window.alert('PASSO 2.1: Localização OK')
+            } catch (gErr) {
+                window.alert('PASSO 2.2: Erro no GPS (ignorando): ' + gErr.message)
             }
 
-            setRegistrationStatus('Salvando dados do prestador...')
-            window.alert('PASSO 2.2: Perfil salvo. Salvando dados profissionais...')
-
-            // 7. Save Provider directly 
-            const { error: providerError } = await supabase
-                .from('service_providers')
-                .upsert({
-                    user_id: userId,
-                    legal_name: form.legal_name,
-                    trade_name: form.trade_name || form.legal_name,
-                    cnpj: form.cnpj,
-                    bio: form.bio,
-                    responsible_name: form.responsible_name,
-                    phone: form.phone,
-                    email: form.email,
-                    address: form.address,
-                    city: form.city,
-                    state: form.state,
-                    latitude: coords.latitude,
-                    longitude: coords.longitude,
-                    services_offered: form.services_offered,
-                    profile_image: profileUrl,
-                    logo_image: logoUrl,
-                    portfolio_images: portfolioUrls,
-                    pix_key: form.pix_key,
-                    referral_code: newReferralCode,
-                    referrer_id: referrerId,
-                    status: 'approved'
-                }, {
-                    onConflict: 'user_id'
-                })
-
-            if (providerError) {
-                console.error("Erro ao salvar prestador:", providerError)
-                throw new Error(`Erro ao salvar prestador: ${providerError.message}`)
-            }
-
-            window.alert('PASSO 3: Tudo salvo com sucesso! Redirecionando...')
-            setRegistrationStatus('Pronto! Redirecionando...')
+            // 3. Uploads (UM POR UM COM ALERTA)
+            window.alert('PASSO 3: Enviando Imagens...')
+            let profileUrl = form.profile_image
+            let logoUrl = form.logo_image
+            let portfolioUrls = []
 
             try {
-                if (refreshProfile) await refreshProfile()
-            } catch (err) {
-                console.warn("Profile refresh failed, but proceeding:", err)
+                if (form.profile_image instanceof File) {
+                    window.alert('PASSO 3.1: Enviando Foto Perfil...')
+                    profileUrl = await uploadMedia(form.profile_image, 'profiles')
+                    window.alert('PASSO 3.1: OK')
+                }
+                if (form.logo_image instanceof File) {
+                    window.alert('PASSO 3.2: Enviando Logo...')
+                    logoUrl = await uploadMedia(form.logo_image, 'logos')
+                    window.alert('PASSO 3.2: OK')
+                }
+                if (form.portfolio_images.length > 0) {
+                    window.alert(`PASSO 3.3: Enviando ${form.portfolio_images.length} fotos portfólio...`)
+                    for (const img of form.portfolio_images) {
+                        if (img instanceof File) {
+                            const url = await uploadMedia(img, 'portfolio')
+                            portfolioUrls.push(url)
+                        } else {
+                            portfolioUrls.push(img)
+                        }
+                    }
+                    window.alert('PASSO 3.3: OK')
+                }
+            } catch (uErr) {
+                window.alert('ERRO no Upload (ignorando para salvar dados): ' + uErr.message)
             }
 
+            // 4. Salvar no Banco (FINAL)
+            window.alert('PASSO 4: Salvando no Banco de Dados...')
+            const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
+
+            // Perfil
+            const { error: pErr } = await supabase.from('profiles').upsert({
+                id: userId,
+                full_name: form.responsible_name,
+                role: 'provider'
+            })
+            if (pErr) window.alert('Erro Perfil: ' + pErr.message)
+
+            // Prestador
+            window.alert('PASSO 4.1: Upsert service_providers...')
+            const { error: spErr } = await supabase.from('service_providers').upsert({
+                user_id: userId,
+                legal_name: form.legal_name,
+                trade_name: form.trade_name || form.legal_name,
+                cnpj: form.cnpj,
+                bio: form.bio,
+                responsible_name: form.responsible_name,
+                phone: form.phone,
+                email: form.email,
+                address: form.address,
+                city: form.city,
+                state: form.state,
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                services_offered: form.services_offered,
+                profile_image: typeof profileUrl === 'string' ? profileUrl : null,
+                logo_image: typeof logoUrl === 'string' ? logoUrl : null,
+                portfolio_images: portfolioUrls,
+                pix_key: form.pix_key,
+                referral_code: newReferralCode,
+                status: 'approved'
+            }, { onConflict: 'user_id' })
+
+            if (spErr) {
+                window.alert('ERRO DATABASE: ' + spErr.message)
+                throw spErr
+            }
+
+            window.alert('PASSO 5: SUCESSO! Finalizando...')
+            if (refreshProfile) await refreshProfile()
             navigate('/dashboard?welcome=true')
+
         } catch (err) {
-            console.error('Registration error detail:', err)
-
-            let userMessage = err.message || 'Erro ao cadastrar. Tente novamente.'
-
+            let userMessage = 'Falha crítica no cadastro: ' + err.message
             // Erro específico de "Foreign Key" sugere sessão fantasma
             if (err.message?.includes('foreign key constraint') && err.message?.includes('user_id')) {
                 userMessage = 'Erro de sincronização de conta. Por favor, saia da conta atual (Logout) e tente novamente em uma janela anônima.'
