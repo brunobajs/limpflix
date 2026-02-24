@@ -68,6 +68,12 @@ export default function ProviderRegister() {
     const navigate = useNavigate()
     const { user, refreshProfile } = useAuth()
     const [registrationStatus, setRegistrationStatus] = useState('')
+    const [debugLog, setDebugLog] = useState([]) // Logs de diagnóstico na tela
+
+    const addLog = (msg) => {
+        console.log(`[Diagnostic] ${msg}`)
+        setDebugLog(prev => [...prev.slice(-3), msg]) // Mostra os últimos 4 logs
+    }
 
     const [form, setForm] = useState({
         // Step 1 - Company
@@ -145,12 +151,14 @@ export default function ProviderRegister() {
 
     // Função par comprimir imagem no cliente (Canvas)
     const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const reader = new FileReader()
             reader.readAsDataURL(file)
+            reader.onerror = () => reject(new Error('Erro ao ler arquivo da imagem'))
             reader.onload = (event) => {
                 const img = new Image()
                 img.src = event.target.result
+                img.onerror = () => reject(new Error('Erro ao carregar objeto de imagem'))
                 img.onload = () => {
                     const canvas = document.createElement('canvas')
                     let width = img.width
@@ -164,9 +172,17 @@ export default function ProviderRegister() {
                     canvas.width = width
                     canvas.height = height
                     const ctx = canvas.getContext('2d')
+                    if (!ctx) {
+                        reject(new Error('Canvas context failed'))
+                        return
+                    }
                     ctx.drawImage(img, 0, 0, width, height)
 
                     canvas.toBlob((blob) => {
+                        if (!blob) {
+                            reject(new Error('Blob conversion failed'))
+                            return
+                        }
                         const compressedFile = new File([blob], file.name, {
                             type: 'image/jpeg',
                             lastModified: Date.now(),
@@ -245,44 +261,69 @@ export default function ProviderRegister() {
     async function handleSubmit() {
         setError('')
         setLoading(true)
-        setRegistrationStatus('Iniciando processamento otimizado...')
+        setDebugLog([])
+        addLog('Iniciando cadastro (Modo Diagnóstico)...')
 
         try {
             // 1. Auth/User ID
             let userId = user?.id
+            if (userId) addLog(`Usuário logado: ${userId.slice(0, 8)}...`)
+
             if (!userId) {
-                setRegistrationStatus('Criando sua conta de acesso...')
+                addLog('Criando conta (Auth)...')
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
                     password: form.password,
                     options: { data: { full_name: form.responsible_name } }
                 })
-                if (signUpError) throw signUpError
+                if (signUpError) {
+                    addLog(`ERRO Auth: ${signUpError.message}`)
+                    if (signUpError.message?.toLowerCase().includes('already')) {
+                        throw new Error('E-mail em uso. Faça login antes ou use outro.')
+                    }
+                    throw signUpError
+                }
                 userId = signUpData?.user?.id
+                addLog('Conta criada com sucesso.')
             }
-            if (!userId) throw new Error('Não foi possível identificar o usuário.')
 
-            // 2. Processamento em Paralelo (Alta Performance)
-            setRegistrationStatus('Preparando fotos e localização...')
+            if (!userId) throw new Error('Falha ao obter ID do usuário.')
 
-            const [profileUrl, logoUrl, portfolioUrls, coords] = await Promise.all([
-                uploadMedia(form.profile_image, 'profiles'),
-                uploadMedia(form.logo_image, 'logos'),
-                Promise.all(form.portfolio_images.map(img => uploadMedia(img, 'portfolio'))),
-                getCoordinates()
-            ])
+            // 2. Localização (Timeout na função já existe)
+            addLog('Buscando coordenadas...')
+            const coords = await getCoordinates()
+            addLog(`Localização OK (${coords.latitude.toFixed(2)})`)
 
-            // 3. Salvar no Banco
-            setRegistrationStatus('Salvando seus dados...')
+            // 3. Imagens (SEQUENCIAL para depuração visual)
+            addLog('Processando foto de perfil...')
+            const profileUrl = await uploadMedia(form.profile_image, 'profiles')
+            addLog('Foto perfil OK')
+
+            addLog('Processando logotipo...')
+            const logoUrl = await uploadMedia(form.logo_image, 'logos')
+            addLog('Logotipo OK')
+
+            addLog(`Processando ${form.portfolio_images.length} fotos portfólio...`)
+            const portfolioUrls = []
+            for (let i = 0; i < form.portfolio_images.length; i++) {
+                addLog(`Enviando foto ${i + 1}/${form.portfolio_images.length}...`)
+                const url = await uploadMedia(form.portfolio_images[i], 'portfolio')
+                portfolioUrls.push(url)
+            }
+            addLog('Portfólio COMPLETO')
+
+            // 4. Salvar no Banco
+            addLog('Salvando dados no sistema...')
             const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
 
-            // Upsert Profile e Provider em sequência garantida
+            addLog('Sincronizando perfil...')
             await supabase.from('profiles').upsert({
                 id: userId,
                 full_name: form.responsible_name,
                 role: 'provider'
             })
 
+            addLog('Finalizando dados profissionais...')
             const { error: spErr } = await supabase.from('service_providers').upsert({
                 user_id: userId,
                 legal_name: form.legal_name,
@@ -306,15 +347,19 @@ export default function ProviderRegister() {
                 status: 'approved'
             }, { onConflict: 'user_id' })
 
-            if (spErr) throw spErr
+            if (spErr) {
+                addLog(`ERRO BANCO: ${spErr.message}`)
+                throw spErr
+            }
 
-            setRegistrationStatus('Sucesso! Redirecionando...')
+            addLog('Pronto! Redirecionando para o painel...')
             if (refreshProfile) await refreshProfile()
             navigate('/dashboard?welcome=true')
 
         } catch (err) {
+            addLog(`FALHA: ${err.message}`)
             console.error('Registration failed:', err)
-            setError('Falha no cadastro: ' + (err.message || 'Erro desconhecido'))
+            setError(err.message || 'Erro inesperado')
         } finally {
             setLoading(false)
         }
@@ -418,6 +463,25 @@ export default function ProviderRegister() {
                     {error && (
                         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm mb-6 border border-red-100">
                             {error}
+                        </div>
+                    )}
+
+                    {/* Diagnostic Console */}
+                    {debugLog.length > 0 && (
+                        <div className="bg-navy/5 border border-navy/10 rounded-xl p-3 mb-6 font-mono text-xs">
+                            <div className="text-navy/50 mb-2 uppercase text-[10px] tracking-wider font-bold italic">Console de Diagnóstico Vital:</div>
+                            {debugLog.map((log, i) => (
+                                <div key={i} className="flex gap-2 text-navy/80">
+                                    <span className="text-navy/30">[{i + 1}]</span>
+                                    <span>{log}</span>
+                                </div>
+                            ))}
+                            {loading && (
+                                <div className="mt-2 flex items-center gap-2 text-green">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    <span>Processando etapa atual...</span>
+                                </div>
+                            )}
                         </div>
                     )}
 
