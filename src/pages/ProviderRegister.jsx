@@ -66,7 +66,7 @@ export default function ProviderRegister() {
     const [error, setError] = useState('')
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
-    const { user } = useAuth()
+    const { user, refreshProfile } = useAuth()
 
     const [form, setForm] = useState({
         // Step 1 - Company
@@ -314,7 +314,12 @@ export default function ProviderRegister() {
             }
 
             // ProviderRegister.jsx: Chamada de refreshProfile após sucesso
-            await refreshProfile()
+            try {
+                if (refreshProfile) await refreshProfile()
+            } catch (pErr) {
+                console.warn("Profile refresh failed, but proceeding to dashboard:", pErr)
+            }
+
             navigate('/dashboard?welcome=true')
         } catch (err) {
             console.error('Registration error detail:', err)
