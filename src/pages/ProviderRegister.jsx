@@ -178,14 +178,24 @@ export default function ProviderRegister() {
 
     async function uploadMedia(file, folder) {
         if (!file) return null
+
+        // Timeout de 10 segundos para não travar o cadastro
+        const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Tempo esgotado no envio da imagem (10s)')), 10000)
+        )
+
         try {
             const fileExt = file.name.split('.').pop()
             const fileName = `${Math.random()}.${fileExt}`
             const filePath = `${folder}/${fileName}`
 
-            const { error: uploadError } = await supabase.storage
+            console.log(`Iniciando upload para ${filePath}...`)
+
+            const uploadTask = supabase.storage
                 .from('providers-media')
                 .upload(filePath, file)
+
+            const { error: uploadError } = await Promise.race([uploadTask, timeout])
 
             if (uploadError) throw uploadError
 
@@ -195,8 +205,9 @@ export default function ProviderRegister() {
 
             return data.publicUrl
         } catch (err) {
-            console.error('Upload error:', err)
-            throw new Error(`Erro ao enviar imagem: ${err.message}`)
+            console.error('Upload error (continuing without image):', err)
+            window.alert('AVISO: Não conseguimos salvar uma das fotos (talvez seja muito grande ou a internet falhou), mas vamos continuar o cadastro sem ela.')
+            return null
         }
     }
 
