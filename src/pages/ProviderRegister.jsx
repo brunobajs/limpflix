@@ -179,9 +179,9 @@ export default function ProviderRegister() {
     async function uploadMedia(file, folder) {
         if (!file) return null
 
-        // Timeout de 10 segundos para não travar o cadastro
+        // Timeout de 30 segundos para garantir o envio em conexões lentas
         const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Tempo esgotado no envio da imagem (10s)')), 10000)
+            setTimeout(() => reject(new Error('Tempo esgotado no envio da imagem (30s)')), 30000)
         )
 
         try {
