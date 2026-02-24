@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { getCurrentPosition } from '../lib/geo'
 import {
-    Building2, User, Wrench, CreditCard,
+    Building2, User, Wrench, CreditCard, Navigation,
     ChevronRight, ChevronLeft, CheckCircle2, Loader2,
     Phone, Mail, MapPin, ArrowLeft, Camera, Image, Plus, X
 } from 'lucide-react'
@@ -20,13 +21,52 @@ const STATES = [
     'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'
 ]
 
+// Gera um código de indicação único baseado no nome + timestamp
+function generateReferralCode(name) {
+    const prefix = (name || 'LIMP')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 4)
+    const suffix = Math.random().toString(36).toUpperCase().slice(2, 6)
+    return `${prefix}${suffix}`
+}
+
+// Aplica máscara de CNPJ: 00.000.000/0000-00
+function maskCNPJ(value) {
+    return value
+        .replace(/\D/g, '')
+        .slice(0, 14)
+        .replace(/^(\d{2})(\d)/, '$1.$2')
+        .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+        .replace(/\.{1}(\d{3})\.(\d{3})(\d)/, '.$1.$2/$3')
+        .replace(/(\d{4})(\d)/, '$1-$2')
+}
+
+// Valida dígitos verificadores do CNPJ
+function isValidCNPJ(cnpj) {
+    const digits = cnpj.replace(/\D/g, '')
+    if (digits.length !== 14) return false
+    if (/^(\d)\1+$/.test(digits)) return false // bloqueia CNPJs com todos dígitos iguais
+
+    const calc = (d, n) => {
+        let sum = 0
+        let pos = n - 7
+        for (let i = n; i >= 1; i--) {
+            sum += parseInt(d[n - i]) * pos--
+            if (pos < 2) pos = 9
+        }
+        return sum % 11 < 2 ? 0 : 11 - (sum % 11)
+    }
+    return calc(digits, 12) === parseInt(digits[12]) && calc(digits, 13) === parseInt(digits[13])
+}
+
 export default function ProviderRegister() {
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
-    const { user, signUp } = useAuth()
+    const { user } = useAuth()
 
     const [form, setForm] = useState({
         // Step 1 - Company
@@ -53,6 +93,9 @@ export default function ProviderRegister() {
         pix_key: '',
         // Referral
         referral_code_input: searchParams.get('ref') || '',
+        // Location (NEW)
+        latitude: null,
+        longitude: null,
     })
 
     const [uploading, setUploading] = useState({
@@ -60,6 +103,31 @@ export default function ProviderRegister() {
         logo: false,
         portfolio: false
     })
+    const [acceptedTerms, setAcceptedTerms] = useState(false)
+    const [geoLoading, setGeoLoading] = useState(false)
+
+    async function handleCaptureLocation() {
+        console.log("Solicitando permissão de localização...")
+        setGeoLoading(true)
+        try {
+            const pos = await getCurrentPosition()
+            console.log("Localização obtida:", pos)
+            setForm(prev => ({
+                ...prev,
+                latitude: pos.latitude,
+                longitude: pos.longitude
+            }))
+            alert('Localização capturada com sucesso! Precisão: ' + (pos.accuracy ? `~${Math.round(pos.accuracy)}m` : 'Alta'))
+        } catch (err) {
+            console.error('Capture location failed:', err)
+            let msg = 'Não foi possível obter sua localização.'
+            if (err.code === 1) msg = 'Permissão de localização negada pelo usuário.'
+            if (err.code === 3) msg = 'Tempo esgotado ao buscar localização.'
+            alert(msg + ' Verifique as permissões do seu navegador.')
+        } finally {
+            setGeoLoading(false)
+        }
+    }
 
     function updateForm(field, value) {
         setForm(prev => ({ ...prev, [field]: value }))
@@ -75,17 +143,33 @@ export default function ProviderRegister() {
     }
 
     async function getCoordinates() {
+        // Se já capturou manualmente, retorna elas
+        if (form.latitude && form.longitude) {
+            console.log("Usando coordenadas capturadas manualmente:", form.latitude, form.longitude)
+            return { latitude: form.latitude, longitude: form.longitude }
+        }
+
         try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout
+
             const address = `${form.address}, ${form.city}, ${form.state}, Brasil`
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
+            console.log("Geocodificando endereço:", address)
+
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, {
+                signal: controller.signal
+            })
+            clearTimeout(timeoutId)
+
             const data = await response.json()
             if (data.length > 0) {
+                console.log("Coordenadas encontradas via geocoding:", data[0].lat, data[0].lon)
                 return { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) }
             }
         } catch (err) {
-            console.warn('Geocoding failed:', err)
+            console.warn('Geocoding failed or timed out:', err)
         }
-        return { latitude: null, longitude: null }
+        return { latitude: -23.5505, longitude: -46.6333 } // Fallback São Paulo se falhar
     }
 
     async function uploadMedia(file, folder) {
@@ -116,73 +200,135 @@ export default function ProviderRegister() {
         setError('')
         setLoading(true)
         try {
+            console.log("Iniciando handleSubmit. Usuário atual da sessão:", user?.id)
+
             // 1. Create auth account if not logged in
             let userId = user?.id
+
             if (!userId) {
-                const { data } = await signUp(form.email, form.password, form.responsible_name)
-                userId = data?.user?.id
-                if (!userId) {
-                    setError('Quase lá! Enviamos um e-mail de confirmação da LimpFlix para você. Verifique sua caixa de entrada (e spam) para ativar sua conta e concluir o cadastro.')
-                    setLoading(false)
-                    return
-                }
-            }
-
-            // 2. Upload images if provided
-            const profileUrl = form.profile_image instanceof File ? await uploadMedia(form.profile_image, 'profiles') : form.profile_image
-            const logoUrl = form.logo_image instanceof File ? await uploadMedia(form.logo_image, 'logos') : form.logo_image
-
-            const portfolioUrls = []
-            for (const item of form.portfolio_images) {
-                if (item instanceof File) {
-                    const url = await uploadMedia(item, 'portfolio')
-                    portfolioUrls.push(url)
-                } else {
-                    portfolioUrls.push(item)
-                }
-            }
-
-            // 3. Get coordinates from address
-            const coords = await getCoordinates()
-
-            // 4. Save provider to Supabase
-            const { error: insertError } = await supabase
-                .from('service_providers')
-                .insert({
-                    user_id: userId,
-                    legal_name: form.legal_name,
-                    trade_name: form.trade_name || form.legal_name,
-                    cnpj: form.cnpj,
-                    bio: form.bio,
-                    responsible_name: form.responsible_name,
-                    phone: form.phone,
+                // Tenta criar a conta
+                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
-                    address: form.address,
-                    city: form.city,
-                    state: form.state,
-                    latitude: coords.latitude,
-                    longitude: coords.longitude,
-                    services_offered: form.services_offered,
-                    profile_image: profileUrl,
-                    logo_image: logoUrl,
-                    portfolio_images: portfolioUrls,
-                    pix_key: form.pix_key,
-                    referral_code: generateReferralCode(),
-                    referrer_id: referrerId,
-                    status: 'approved',
+                    password: form.password,
+                    options: {
+                        data: { full_name: form.responsible_name }
+                    }
                 })
 
-            if (insertError) throw insertError
+                if (signUpError) {
+                    // Caso o erro seja de usuário já existente, podemos tentar fazer o login automático
+                    // ou pedir para o usuário logar. Aqui, vamos lançar o erro amigável.
+                    if (signUpError.message.toLowerCase().includes('already registered')) {
+                        throw new Error('Este e-mail já está em uso. Por favor, faça login antes de se cadastrar como profissional.')
+                    }
+                    throw signUpError
+                }
 
-            // 5. Update referrer's count
-            if (referrerId) {
-                await supabase.rpc('increment_referrals', { provider_id: referrerId })
+                userId = signUpData?.user?.id
+
+                // IMPORTANTE: Alguns provedores do Supabase podem demorar milissegundos para propagar o usuário
+                // Se o userId veio nulo do signUp (raro), tentamos pegar a sessão atual
+                if (!userId) {
+                    const { data: sessionData } = await supabase.auth.getSession()
+                    userId = sessionData?.session?.user?.id
+                }
+
+                if (!userId) {
+                    throw new Error('Não foi possível criar sua conta de acesso. Tente novamente ou use outro e-mail.')
+                }
+
+                // Pequeno delay para garantir que o trigger handle_new_user termine e o banco sincronize
+                console.log("Aguardando sincronização do banco...")
+                await new Promise(resolve => setTimeout(resolve, 1000))
+
+                // Diagnóstico: Verificar se o usuário realmente existe no banco agora
+                const { data: userExists, error: checkError } = await supabase.rpc('check_user_exists', { p_user_id: userId })
+                console.log("Diagnóstico - Usuário criado existe no banco (auth.users)?", userExists, checkError || "")
+
+                if (checkError) console.warn("Erro ao verificar existência do usuário:", checkError)
+            }
+            // Removido o bloqueio de 'existingProvider' para permitir que qualquer conta (mesmo de cliente) se torne prestador.
+
+
+            // 2. Buscar referrerId pelo código de indicação (se informado)
+            let referrerId = null
+            if (form.referral_code_input.trim()) {
+                const { data: referrerData } = await supabase
+                    .from('service_providers')
+                    .select('id')
+                    .eq('referral_code', form.referral_code_input.trim().toUpperCase())
+                    .single()
+                referrerId = referrerData?.id || null
             }
 
+            // 3. Parallelize: Upload images AND get coordinates (Geocoding)
+            console.log("Iniciando processamento paralelo (Uploads + Geo)...")
+
+            const uploadProfiles = form.profile_image instanceof File ? uploadMedia(form.profile_image, 'profiles') : Promise.resolve(form.profile_image)
+            const uploadLogos = form.logo_image instanceof File ? uploadMedia(form.logo_image, 'logos') : Promise.resolve(form.logo_image)
+            const uploadPortfolio = Promise.all(
+                form.portfolio_images.map(item => item instanceof File ? uploadMedia(item, 'portfolio') : Promise.resolve(item))
+            )
+
+            const [profileUrl, logoUrl, portfolioUrls, coords] = await Promise.all([
+                uploadProfiles,
+                uploadLogos,
+                uploadPortfolio,
+                getCoordinates()
+            ])
+
+            console.log("Processamento paralelo concluído:", { profileUrl, logoUrl, portfolioCount: portfolioUrls.length, coords })
+
+            // 5. Gerar código de indicação único para o novo prestador
+            const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
+
+            // 6. Save provider to Supabase using RPC v3 (Atômico & Dual Role)
+            console.log("Chamando RPC register_provider_v3 para user_id:", userId)
+
+            const { error: rpcError } = await supabase.rpc('register_provider_v3', {
+                p_user_id: userId,
+                p_legal_name: form.legal_name,
+                p_trade_name: form.trade_name || form.legal_name,
+                p_cnpj: form.cnpj,
+                p_bio: form.bio,
+                p_responsible_name: form.responsible_name,
+                p_phone: form.phone,
+                p_email: form.email,
+                p_address: form.address,
+                p_city: form.city,
+                p_state: form.state,
+                p_latitude: coords.latitude,
+                p_longitude: coords.longitude,
+                p_services_offered: form.services_offered,
+                p_profile_image: profileUrl,
+                p_logo_image: logoUrl,
+                p_portfolio_images: portfolioUrls,
+                p_pix_key: form.pix_key,
+                p_referral_code: newReferralCode,
+                p_referrer_id: referrerId
+            })
+
+            if (rpcError) {
+                console.error("Erro no RPC v3:", rpcError)
+                throw rpcError
+            }
+
+            // ProviderRegister.jsx: Chamada de refreshProfile após sucesso
+            await refreshProfile()
             navigate('/dashboard?welcome=true')
         } catch (err) {
-            console.error('Registration error:', err)
-            setError(err.message || 'Erro ao cadastrar. Tente novamente.')
+            console.error('Registration error detail:', err)
+
+            let userMessage = err.message || 'Erro ao cadastrar. Tente novamente.'
+
+            // Erro específico de "Foreign Key" sugere sessão fantasma
+            if (err.message?.includes('foreign key constraint') && err.message?.includes('user_id')) {
+                userMessage = 'Erro de sincronização de conta. Por favor, saia da conta atual (Logout) e tente novamente em uma janela anônima.'
+                // Opcional: Forçar logout técnico para limpar a sessão fantasma
+                supabase.auth.signOut().then(() => console.log("Sessão limpa após erro de FK"))
+            }
+
+            setError(userMessage)
         } finally {
             setLoading(false)
         }
@@ -193,6 +339,7 @@ export default function ProviderRegister() {
             case 1:
                 if (!form.legal_name.trim()) return 'Preencha a Razão Social / Nome'
                 if (!form.cnpj.trim()) return 'Preencha o CNPJ (Obrigatório)'
+                if (!isValidCNPJ(form.cnpj)) return 'CNPJ inválido. Verifique os números digitados.'
                 return null
             case 2:
                 if (!form.responsible_name.trim()) return 'Preencha o nome do responsável'
@@ -204,6 +351,9 @@ export default function ProviderRegister() {
                 return null
             case 3:
                 if (form.services_offered.length === 0) return 'Selecione pelo menos um serviço'
+                return null
+            case 5:
+                if (!acceptedTerms) return 'Você precisa aceitar os Termos de Responsabilidade para finalizar o cadastro.'
                 return null
             default:
                 return null
@@ -306,11 +456,18 @@ export default function ProviderRegister() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ *</label>
-                                <input type="text" value={form.cnpj} onChange={(e) => updateForm('cnpj', e.target.value)}
-                                    placeholder="00.000.000/0000-00 (Obrigatório)"
+                                <input type="text" value={form.cnpj}
+                                    onChange={(e) => updateForm('cnpj', maskCNPJ(e.target.value))}
+                                    placeholder="00.000.000/0000-00"
+                                    maxLength={18}
                                     required
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green text-gray-800"
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green text-gray-800 font-mono"
                                 />
+                                {form.cnpj.replace(/\D/g, '').length === 14 && (
+                                    <p className={`text-xs mt-1 font-medium ${isValidCNPJ(form.cnpj) ? 'text-green' : 'text-red-500'}`}>
+                                        {isValidCNPJ(form.cnpj) ? '✓ CNPJ válido' : '✗ CNPJ inválido'}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Descrição do seu negócio</label>
@@ -362,13 +519,33 @@ export default function ProviderRegister() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
-                                <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                    <input type="text" value={form.address} onChange={(e) => updateForm('address', e.target.value)}
-                                        placeholder="Rua, número, bairro"
-                                        className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green text-gray-800"
-                                    />
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="relative flex-1">
+                                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input type="text" value={form.address} onChange={(e) => updateForm('address', e.target.value)}
+                                            placeholder="Rua, número, bairro"
+                                            className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green text-gray-800"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleCaptureLocation}
+                                        disabled={geoLoading}
+                                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border font-semibold transition-all shadow-sm ${form.latitude ? 'bg-green/10 border-green text-green' : 'bg-green hover:bg-green-dark text-white border-green'}`}
+                                    >
+                                        {geoLoading ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <Navigation className="w-5 h-5" />
+                                        )}
+                                        {form.latitude ? 'Localização Capturada' : 'Detectar meu GPS'}
+                                    </button>
                                 </div>
+                                {form.latitude && (
+                                    <p className="text-[10px] text-green mt-1 flex items-center gap-1 font-medium">
+                                        <CheckCircle2 className="w-3 h-3" /> Coordenadas capturadas via GPS
+                                    </p>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -554,6 +731,28 @@ export default function ProviderRegister() {
                                     <div className="flex justify-between"><span className="text-gray-500">Cidade:</span><span className="text-gray-800 font-medium">{form.city}, {form.state}</span></div>
                                     <div className="flex justify-between"><span className="text-gray-500">Serviços:</span><span className="text-gray-800 font-medium">{form.services_offered.length} selecionados</span></div>
                                 </div>
+                            </div>
+                            {/* Termo de Responsabilidade */}
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
+                                <p className="text-amber-800 font-semibold text-sm mb-2">⚠️ Termo de Responsabilidade Civil</p>
+                                <p className="text-amber-700 text-xs leading-relaxed mb-3">
+                                    O prestador de serviço é o <strong>único e exclusivo responsável</strong> por quaisquer <strong>danos materiais, roubo, furto ou danos ao objeto do serviço</strong> ocorridos durante a prestação. A <strong>LimpFlix está expressamente isenta</strong> de qualquer ônus, responsabilidade civil, criminal ou administrativa decorrente dos atos do prestador.
+                                </p>
+                                <label className="flex items-start gap-3 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={acceptedTerms}
+                                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                        className="mt-0.5 w-4 h-4 accent-green cursor-pointer flex-shrink-0"
+                                    />
+                                    <span className="text-xs text-amber-800 font-medium group-hover:text-amber-900">
+                                        Li e aceito os{' '}
+                                        <a href="/termos" target="_blank" rel="noopener noreferrer" className="underline text-green hover:text-green-dark">
+                                            Termos de Uso
+                                        </a>{' '}
+                                        e a cláusula de responsabilidade civil do prestador de serviço (Seção 7).
+                                    </span>
+                                </label>
                             </div>
                         </div>
                     )}

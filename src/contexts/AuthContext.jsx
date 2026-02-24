@@ -10,15 +10,27 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null)
-            if (session?.user) loadProfile(session.user.id)
-            else setLoading(false)
-        })
+        const getInitialSession = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession()
+                setUser(session?.user ?? null)
+                if (session?.user) {
+                    await loadProfile(session.user.id)
+                } else {
+                    setLoading(false)
+                }
+            } catch (err) {
+                console.error("Initial session error:", err)
+                setLoading(false)
+            }
+        }
+
+        getInitialSession()
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, session) => {
+            async (event, session) => {
+                console.log("Auth Event:", event)
                 setUser(session?.user ?? null)
                 if (session?.user) {
                     await loadProfile(session.user.id)
@@ -34,17 +46,29 @@ export function AuthProvider({ children }) {
 
     async function loadProfile(userId) {
         try {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
                 .single()
-            setProfile(data)
+
+            if (error) {
+                console.warn('Profile not found, creating default client profile...')
+                // No dual role system, we can be proactive here or just set null
+                setProfile(null)
+            } else {
+                setProfile(data)
+            }
         } catch (err) {
             console.error('Error loading profile:', err)
         } finally {
             setLoading(false)
         }
+    }
+
+    async function refreshProfile() {
+        if (!user) return
+        await loadProfile(user.id)
     }
 
     async function signUp(email, password, fullName) {
@@ -95,7 +119,9 @@ export function AuthProvider({ children }) {
         signIn,
         signOut,
         updateProfile,
+        refreshProfile,
         isAuthenticated: !!user,
+        isProvider: profile?.role === 'provider',
     }
 
     return (

@@ -43,14 +43,24 @@ export function getCurrentPosition() {
  * Sort providers by distance from a given location
  */
 export function sortByDistance(providers, userLat, userLon) {
+    if (!userLat || !userLon) return providers
+
+    console.log(`Ordenando ${providers.length} prestadores por distância de [${userLat}, ${userLon}]`)
+
     return providers
-        .map((p) => ({
-            ...p,
-            distance:
-                p.latitude && p.longitude
-                    ? calculateDistance(userLat, userLon, p.latitude, p.longitude)
-                    : null,
-        }))
+        .map((p) => {
+            const distance = (p.latitude && p.longitude)
+                ? calculateDistance(userLat, userLon, p.latitude, p.longitude)
+                : null
+
+            // Log para debug opcional
+            // console.log(`Prestador ${p.trade_name}: ${distance ? distance.toFixed(2) + 'km' : 'sem coords'}`)
+
+            return {
+                ...p,
+                distance
+            }
+        })
         .sort((a, b) => {
             if (a.distance === null && b.distance === null) return 0
             if (a.distance === null) return 1

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Send, Image, Loader2, User, Clock } from 'lucide-react'
+import { Send, Image, Loader2, User, Clock, DollarSign, X, CheckCircle2 } from 'lucide-react'
 
 export default function ChatWindow({ conversationId, otherPartyName }) {
     const { user } = useAuth()
@@ -9,6 +9,13 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
     const [sending, setSending] = useState(false)
+    const [isProvider, setIsProvider] = useState(false)
+    const [providerData, setProviderData] = useState(null)
+    const [clientData, setClientData] = useState(null)
+    const [showQuoteModal, setShowQuoteModal] = useState(false)
+    const [quoteAmount, setQuoteAmount] = useState('')
+    const [quoteDescription, setQuoteDescription] = useState('')
+    const [sendingQuote, setSendingQuote] = useState(false)
     const messagesEndRef = useRef(null)
 
     useEffect(() => {
@@ -63,8 +70,12 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                 .single()
 
             if (conv) {
-                const isProvider = conv.service_providers.user_id === user.id
-                const updateData = isProvider
+                const isProv = conv.service_providers.user_id === user.id
+                setIsProvider(isProv)
+                setProviderData({ id: conv.provider_id })
+                setClientData({ id: conv.client_id })
+
+                const updateData = isProv
                     ? { provider_last_read_at: new Date().toISOString() }
                     : { client_last_read_at: new Date().toISOString() }
 
@@ -82,6 +93,60 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
 
     function scrollToBottom() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+
+    async function handleSendQuote() {
+        if (!quoteAmount || isNaN(quoteAmount) || parseFloat(quoteAmount) <= 0) {
+            alert('Por favor, insira um valor válido.')
+            return
+        }
+
+        setSendingQuote(true)
+        try {
+            // 1. Inserir na tabela de orçamentos
+            const { data: quote, error: quoteError } = await supabase
+                .from('service_quotes')
+                .insert({
+                    conversation_id: conversationId,
+                    provider_id: providerData.id,
+                    client_id: clientData.id,
+                    amount: parseFloat(quoteAmount),
+                    description: quoteDescription
+                })
+                .select()
+                .single()
+
+            if (quoteError) throw quoteError
+
+            // 2. Enviar mensagem automática no chat
+            const message = `📄 ORÇAMENTO ENVIADO\nValor: R$ ${parseFloat(quoteAmount).toFixed(2)}\n${quoteDescription ? `Descrição: ${quoteDescription}\n` : ''}\nPara aceitar e agendar, clique no botão que apareceu acima.`
+
+            await supabase.from('chat_messages').insert({
+                conversation_id: conversationId,
+                sender_id: user.id,
+                content: message
+            })
+
+            // 3. Update last message
+            await supabase
+                .from('chat_conversations')
+                .update({
+                    last_message: '📄 Orçamento enviado',
+                    last_message_at: new Date().toISOString()
+                })
+                .eq('id', conversationId)
+
+            setShowQuoteModal(false)
+            setQuoteAmount('')
+            setQuoteDescription('')
+            alert('Orçamento enviado com sucesso!')
+
+        } catch (err) {
+            console.error('Error sending quote:', err)
+            alert('Erro ao enviar orçamento.')
+        } finally {
+            setSendingQuote(false)
+        }
     }
 
     async function handleSendMessage(e) {
@@ -145,6 +210,15 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                         </p>
                     </div>
                 </div>
+                {isProvider && (
+                    <button
+                        onClick={() => setShowQuoteModal(true)}
+                        className="bg-navy hover:bg-navy-light text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                    >
+                        <DollarSign className="w-3.5 h-3.5" />
+                        Enviar Orçamento
+                    </button>
+                )}
             </div>
 
             {/* Messages Area */}
@@ -212,6 +286,66 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                     </button>
                 </form>
             </div>
+
+            {/* Quote Modal */}
+            {showQuoteModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-fade-in relative">
+                        <button
+                            onClick={() => setShowQuoteModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <div className="text-center mb-6">
+                            <div className="w-12 h-12 bg-navy/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                                <DollarSign className="w-6 h-6 text-navy" />
+                            </div>
+                            <h2 className="text-lg font-bold text-gray-900">Enviar Orçamento</h2>
+                            <p className="text-xs text-gray-500">Defina o valor do serviço para o cliente:</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Valor do Serviço (R$)</label>
+                                <input
+                                    type="number"
+                                    value={quoteAmount}
+                                    onChange={(e) => setQuoteAmount(e.target.value)}
+                                    placeholder="Ex: 150.00"
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-navy text-lg font-bold"
+                                />
+                                <p className="text-[10px] text-gray-400 mt-1">* Taxa de 5% da plataforma + 1% de indicação serão descontados do valor líquido.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Descrição Opcional</label>
+                                <textarea
+                                    value={quoteDescription}
+                                    onChange={(e) => setQuoteDescription(e.target.value)}
+                                    placeholder="O que está incluso?"
+                                    rows={3}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-navy text-sm resize-none"
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleSendQuote}
+                                disabled={sendingQuote || !quoteAmount}
+                                className="w-full bg-navy hover:bg-navy-light text-white py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {sendingQuote ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                                    <>
+                                        <CheckCircle2 className="w-5 h-5" />
+                                        Enviar Proposta
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

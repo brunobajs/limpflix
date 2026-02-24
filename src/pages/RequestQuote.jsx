@@ -78,8 +78,24 @@ export default function RequestQuote() {
         setLoading(true)
         setError(null)
         try {
-            // 1. Upload Media (Mock function for now as buckets might not exist)
-            const mediaUrls = await mockUploadFiles(mediaFiles)
+            // 1. Upload Media to Supabase Storage
+            const mediaUrls = []
+            for (const file of mediaFiles) {
+                const fileExt = file.name.split('.').pop()
+                const fileName = `${Math.random()}.${fileExt}`
+                const filePath = `quotes/${fileName}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('providers-media') // Reutilizando bucket ou mudando para específico
+                    .upload(filePath, file)
+
+                if (!uploadError) {
+                    const { data } = supabase.storage
+                        .from('providers-media')
+                        .getPublicUrl(filePath)
+                    mediaUrls.push(data.publicUrl)
+                }
+            }
 
             // 2. Create Quote Request
             const { data: quoteRequest, error: quoteError } = await supabase
@@ -100,28 +116,40 @@ export default function RequestQuote() {
             if (quoteError) throw quoteError
 
             // 3. Find 3 Nearest Providers
+            if (!location?.latitude || !location?.longitude) {
+                throw new Error('Não foi possível obter sua localização. Por favor, ative o GPS ou digite seu endereço.')
+            }
+
             const { data: providers } = await supabase
                 .from('service_providers')
                 .select('*')
                 .eq('status', 'approved')
-                .eq('is_busy', false) // Rule: Must not be busy
+                .eq('is_busy', false)
 
-            // Filter by service (simplified check, ideal would be DB array contains)
-            // For now assuming providers offer all or we check array in code
+            // Filtro por serviço e proximidade real
             const serviceName = services.find(s => s.id === serviceId)?.name
-            const eligible = providers.filter(p => !p.services_offered || p.services_offered.includes(serviceName))
+
+            // Log para debug
+            console.log(`Buscando profissionais para: ${serviceName} perto de ${location.latitude}, ${location.longitude}`)
+
+            const eligible = providers.filter(p => {
+                const hasService = p.services_offered?.includes(serviceName)
+                return hasService
+            })
 
             const sorted = sortByDistance(eligible, location.latitude, location.longitude)
             const top3 = sorted.slice(0, 3)
 
+            console.log(`Encontrados ${top3.length} profissionais próximos.`)
+
             if (top3.length === 0) {
-                throw new Error('Nenhum profissional disponível próximo a você para este serviço.')
+                throw new Error('Infelizmente não encontramos profissionais disponíveis nesta região para este serviço.')
             }
 
             // 4. Create Chats
             const user = (await supabase.auth.getUser()).data.user
             for (const provider of top3) {
-                const { data: chat } = await supabase
+                const { data: chat, error: chatError } = await supabase
                     .from('chat_conversations')
                     .insert({
                         client_id: user.id,
@@ -132,11 +160,13 @@ export default function RequestQuote() {
                     .select()
                     .single()
 
+                if (chatError) continue // Pula se der erro em um chat específico
+
                 // Insert Initial Message
                 await supabase.from('chat_messages').insert({
                     conversation_id: chat.id,
                     sender_id: user.id,
-                    content: `Olá! Gostaria de um orçamento.\n\nDescrição: ${description}\n\nMídias: ${mediaUrls.length} arquivo(s) anexado(s).`
+                    content: `Olá! Solicitei um orçamento para "${serviceName}".\n\nDescrição: ${description}\n\nLocalização: ${address}`
                 })
             }
 

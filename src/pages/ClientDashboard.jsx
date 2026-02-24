@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import {
-    Loader2, Star
+    Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 export default function ClientDashboard() {
     const navigate = useNavigate()
+    const { user, loading: authLoading } = useAuth()
     const [loading, setLoading] = useState(true)
-    const [user, setUser] = useState(null)
     const [chats, setChats] = useState([])
     const [selectedChat, setSelectedChat] = useState(null)
     const [activeBooking, setActiveBooking] = useState(null)
     const [messages, setMessages] = useState([])
     const [newMessage, setNewMessage] = useState('')
+    const [activeQuote, setActiveQuote] = useState(null)
     const [showReviewModal, setShowReviewModal] = useState(false)
     const [reviewRating, setReviewRating] = useState(5)
     const [reviewText, setReviewText] = useState('')
@@ -22,8 +24,10 @@ export default function ClientDashboard() {
 
     // Poll for messages in real-time (simplified)
     useEffect(() => {
-        checkUser()
-    }, [])
+        if (!authLoading) {
+            checkUser()
+        }
+    }, [authLoading, user])
 
     useEffect(() => {
         if (selectedChat) {
@@ -34,12 +38,10 @@ export default function ClientDashboard() {
     }, [selectedChat])
 
     async function checkUser() {
-        const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
             navigate('/login')
             return
         }
-        setUser(user)
         loadChats(user.id)
     }
 
@@ -75,7 +77,21 @@ export default function ClientDashboard() {
 
         if (selectedChat) {
             checkActiveBooking(selectedChat.provider.id)
+            loadActiveQuote(chatId)
         }
+    }
+
+    async function loadActiveQuote(chatId) {
+        const { data } = await supabase
+            .from('service_quotes')
+            .select('*')
+            .eq('conversation_id', chatId)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+        setActiveQuote(data)
     }
 
     async function checkActiveBooking(providerId) {
@@ -190,10 +206,12 @@ export default function ClientDashboard() {
 
     function handleHire() {
         if (!selectedChat) return
-        // No futuro, o preço pode ser extraído de uma proposta formal no BD.
-        // Por enquanto, usaremos o padrão ou permitiremos que o cliente ajuste se necessário.
-        const defaultAmount = 200.00
-        navigate(`/pagamento?quote_id=${selectedChat.quote_request_id}&provider_id=${selectedChat.provider.id}&chat_id=${selectedChat.id}&amount=${defaultAmount}`)
+
+        // Se houver um orçamento ativo, usa o valor dele. Caso contrário (fallback), usa o padrão.
+        const amount = activeQuote ? activeQuote.amount : 200.00
+        const quoteId = activeQuote ? activeQuote.id : ''
+
+        navigate(`/pagamento?quote_id=${selectedChat.quote_request_id || ''}&provider_id=${selectedChat.provider.id}&chat_id=${selectedChat.id}&amount=${amount}&service_quote_id=${quoteId}`)
     }
 
     if (loading) {
@@ -285,13 +303,31 @@ export default function ClientDashboard() {
                                 </div>
                                 <div>
                                     {selectedChat.status === 'active' && !activeBooking && (
-                                        <button
-                                            onClick={handleHire}
-                                            className="bg-green hover:bg-green-dark text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2"
-                                        >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                            Contratar
-                                        </button>
+                                        <div className="flex items-center gap-3">
+                                            {activeQuote ? (
+                                                <div className="flex items-center gap-2 bg-green/10 px-4 py-2 rounded-xl border border-green/20">
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orçamento</p>
+                                                        <p className="text-green font-bold text-sm">R$ {activeQuote.amount.toFixed(2)}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={handleHire}
+                                                        className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2"
+                                                    >
+                                                        <CreditCard className="w-3.5 h-3.5" />
+                                                        Pagar
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={handleHire}
+                                                    className="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
+                                                >
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                    Contratar (R$ 200)
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                     {activeBooking?.status === 'waiting_client_confirmation' && (
                                         <button

@@ -14,6 +14,8 @@ import ClientDashboard from './pages/ClientDashboard'
 import PaymentPage from './pages/PaymentPage'
 import PaymentSuccess from './pages/PaymentSuccess'
 import AdminDashboard from './pages/AdminDashboard'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import { useEffect } from 'react'
 
 // ScrollToTop component
@@ -57,6 +59,8 @@ function App() {
                     <Route path="/cliente/dashboard" element={<ClientDashboard />} />
                     <Route path="/dashboard" element={<ProviderDashboard />} />
                     <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/termos" element={<Layout><Terms /></Layout>} />
+                    <Route path="/privacidade" element={<Layout><Privacy /></Layout>} />
 
                     {/* Fallback 404 */}
                     <Route path="*" element={

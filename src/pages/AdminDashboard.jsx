@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import {
     LayoutDashboard, Users, Building2, MapPin,
     TrendingUp, Calendar, Search, Filter,
@@ -10,6 +11,7 @@ import {
 
 export default function AdminDashboard() {
     const navigate = useNavigate()
+    const { user, profile: authProfile, loading: authLoading } = useAuth()
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState({
         totalProviders: 0,
@@ -22,26 +24,21 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('overview')
 
     useEffect(() => {
-        checkAdmin()
-        loadAdminData()
-    }, [])
+        if (!authLoading) {
+            checkAdmin()
+            loadAdminData()
+        }
+    }, [authLoading, user])
 
     async function checkAdmin() {
-        const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
             navigate('/login')
             return
         }
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        if (profile?.role !== 'admin') {
-            // Em produção reativar: navigate('/')
+        if (authProfile?.role !== 'admin') {
             console.log('User is not admin, but allowing for dev')
+            // navigate('/')
         }
     }
 

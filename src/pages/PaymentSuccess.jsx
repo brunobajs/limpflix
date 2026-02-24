@@ -26,6 +26,7 @@ export default function PaymentSuccess() {
             const clientId = searchParams.get('client_id')
             const amount = parseFloat(searchParams.get('amount'))
             const serviceName = searchParams.get('service_name')
+            const serviceQuoteId = searchParams.get('service_quote_id')
 
             if (!providerId || !clientId) {
                 console.warn('Missing data for booking confirmation')
@@ -52,11 +53,22 @@ export default function PaymentSuccess() {
                         client_id: clientId,
                         service_name: serviceName || 'Limpeza/Serviço especial',
                         total_amount: amount,
+                        platform_fee: amount * 0.06, // 5% plataforma + 1% indicação
+                        provider_net_amount: amount * 0.94,
                         status: 'confirmed',
-                        payment_status: 'paid'
+                        payment_status: 'paid',
+                        quote_id: serviceQuoteId || null
                     })
 
                 if (insertError) throw insertError
+
+                // 1.1 Atualizar status do orçamento se existir
+                if (serviceQuoteId) {
+                    await supabase
+                        .from('service_quotes')
+                        .update({ status: 'paid' })
+                        .eq('id', serviceQuoteId)
+                }
 
                 // 2. Marcar profissional como ocupado
                 await supabase
@@ -96,9 +108,16 @@ export default function PaymentSuccess() {
                 .eq('id', clientId)
                 .single()
 
-            let referrerId = clientProfile?.referred_by_provider_id || provider?.referrer_id
-            let referralAmt = totalAmount * 0.01
+            let clientReferrerId = clientProfile?.referred_by_provider_id
+            let providerReferrerId = provider?.referrer_id
+
+            // Nova regra conforme solicitação do usuário:
+            // 94% Prestador
+            // 5% Plataforma
+            // 1% Indicação (pode ser 0.5% para o indicador do cliente e 0.5% para o do profissional)
+
             let providerAmt = totalAmount * 0.94
+            let totalReferralAmt = totalAmount * 0.01
 
             // 3. Executar Repasse ao Prestador (94%)
             try {
@@ -112,24 +131,37 @@ export default function PaymentSuccess() {
                 console.error('Failed to send automated payout to provider:', err)
             }
 
-            // 4. Executar Repasse ao Indicador (1%) se existir
-            if (referrerId && referrerId !== providerId) {
-                const { data: referrer } = await supabase
-                    .from('service_providers')
-                    .select('pix_key')
-                    .eq('id', referrerId)
-                    .single()
+            // 4. Executar Repasse aos Indicadores (Total 1%)
+            const referrers = []
+            if (clientReferrerId) referrers.push(clientReferrerId)
+            if (providerReferrerId && providerReferrerId !== providerId) {
+                // Evitar duplicidade se for o mesmo ID
+                if (!referrers.includes(providerReferrerId)) {
+                    referrers.push(providerReferrerId)
+                }
+            }
 
-                if (referrer?.pix_key) {
-                    try {
-                        await sendPayoutPix({
-                            pixKey: referrer.pix_key,
-                            amount: referralAmt,
-                            description: `Comissão Indicação LimpFlix`
-                        })
-                        console.log('Automated payout sent to referrer:', referralAmt)
-                    } catch (err) {
-                        console.error('Failed to send automated payout to referrer:', err)
+            if (referrers.length > 0) {
+                const individualReferralAmt = totalReferralAmt / referrers.length
+
+                for (const refId of referrers) {
+                    const { data: referrer } = await supabase
+                        .from('service_providers')
+                        .select('pix_key')
+                        .eq('id', refId)
+                        .single()
+
+                    if (referrer?.pix_key) {
+                        try {
+                            await sendPayoutPix({
+                                pixKey: referrer.pix_key,
+                                amount: individualReferralAmt,
+                                description: `Comissão Indicação LimpFlix`
+                            })
+                            console.log(`Automated payout sent to referrer ${refId}:`, individualReferralAmt)
+                        } catch (err) {
+                            console.error(`Failed to send automated payout to referrer ${refId}:`, err)
+                        }
                     }
                 }
             }

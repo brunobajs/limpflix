@@ -27,7 +27,7 @@ const STATES = [
 ]
 
 export default function ProviderDashboard() {
-    const { user, signOut } = useAuth()
+    const { user, loading: authLoading, signOut, refreshProfile } = useAuth()
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
 
@@ -50,29 +50,46 @@ export default function ProviderDashboard() {
     const [loadingTransactions, setLoadingTransactions] = useState(false)
     const [isWithdrawing, setIsWithdrawing] = useState(false)
 
+    // 1. Initial Data Loading (only when user changes)
     useEffect(() => {
-        if (!user) {
-            navigate('/login')
-            return
-        }
+        if (!user) return
 
+        const initialLoad = async () => {
+            try {
+                await refreshProfile()
+                await loadProviderData()
+            } catch (err) {
+                console.error("Erro no carregamento inicial:", err)
+            }
+        }
+        initialLoad()
+    }, [user])
+
+    // 2. Tab Navigation (only when searchParams changes)
+    useEffect(() => {
         const tab = searchParams.get('tab')
-        if (tab && tabs.some(t => t.id === tab)) {
+        const tabsList = [
+            { id: 'overview' }, { id: 'bookings' }, { id: 'wallet' },
+            { id: 'reviews' }, { id: 'referrals' }, { id: 'messages' }, { id: 'settings' }
+        ]
+        if (tab && tabsList.some(t => t.id === tab)) {
             setActiveTab(tab)
         }
+    }, [searchParams])
 
-        loadProviderData()
+    // 3. Real-time Subscription (only when provider.id is ready)
+    useEffect(() => {
+        if (!provider?.id) return
 
-        // Real-time listener for new service requests/bookings
         const channel = supabase
-            .channel('provider-notifications')
+            .channel(`provider-notifs-${provider.id}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'INSERT',
                     schema: 'public',
                     table: 'service_bookings',
-                    filter: `provider_id=eq.${provider?.id}`
+                    filter: `provider_id=eq.${provider.id}`
                 },
                 () => {
                     playNotificationSound()
@@ -84,7 +101,14 @@ export default function ProviderDashboard() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [user, searchParams, provider?.id])
+    }, [provider?.id])
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            navigate('/login')
+            return
+        }
+    }, [user, authLoading])
 
     function playNotificationSound() {
         try {
@@ -111,12 +135,24 @@ export default function ProviderDashboard() {
     }
 
     async function loadProviderData() {
+        if (!user) {
+            setLoading(false)
+            return
+        }
+
         try {
-            const { data: providerData } = await supabase
+            const { data: providerData, error: providerError } = await supabase
                 .from('service_providers')
                 .select('*')
                 .eq('user_id', user.id)
                 .single()
+
+            if (providerError && providerError.code !== 'PGRST116') {
+                throw providerError
+            }
+
+            console.log("Dashboard Debug - User ID:", user.id)
+            console.log("Dashboard Debug - Provider Data found:", providerData)
 
             setProvider(providerData)
             setEditForm(providerData || {})
@@ -324,6 +360,7 @@ export default function ProviderDashboard() {
             <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
                 <h2 className="text-xl font-bold text-gray-700">Nenhum perfil de profissional encontrado</h2>
                 <p className="text-gray-500 text-center">Você precisa se cadastrar como profissional primeiro.</p>
+                <p className="text-[10px] text-gray-400">ID logado: {user?.id}</p>
                 <button
                     onClick={() => navigate('/cadastro-profissional')}
                     className="bg-green hover:bg-green-dark text-white px-6 py-3 rounded-xl font-semibold transition-all"

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import {
     CreditCard, CheckCircle2, ShieldCheck, Loader2,
     AlertCircle, FileX, QrCode
@@ -9,14 +10,18 @@ import { createPaymentPreference } from '../lib/mercadopago'
 
 export default function PaymentPage() {
     const navigate = useNavigate()
+    const { user } = useAuth()
     const [searchParams] = useSearchParams()
     const quoteId = searchParams.get('quote_id')
     const providerId = searchParams.get('provider_id')
     const chatId = searchParams.get('chat_id')
 
+    const serviceQuoteId = searchParams.get('service_quote_id')
+
     const [loading, setLoading] = useState(false)
     const [processing, setProcessing] = useState(false)
     const [amount, setAmount] = useState(parseFloat(searchParams.get('amount')) || 200.00)
+    const [paymentMethod, setPaymentMethod] = useState('pix')
     const [provider, setProvider] = useState(null)
     const [service, setService] = useState(null)
 
@@ -36,7 +41,18 @@ export default function PaymentPage() {
             const { data: prov } = await supabase.from('service_providers').select('*').eq('id', providerId).single()
             setProvider(prov)
 
-            // Price is dynamic from URL
+            // Se houver um ID de orçamento, carregar o valor real do banco para segurança
+            if (serviceQuoteId) {
+                const { data: quote } = await supabase
+                    .from('service_quotes')
+                    .select('amount')
+                    .eq('id', serviceQuoteId)
+                    .single()
+
+                if (quote) {
+                    setAmount(parseFloat(quote.amount))
+                }
+            }
         } catch (err) {
             console.error(err)
         } finally {
@@ -45,12 +61,10 @@ export default function PaymentPage() {
     }
 
     async function handlePayment() {
-        if (!provider) return
+        if (!provider || !user) return
         setProcessing(true)
 
         try {
-            const user = (await supabase.auth.getUser()).data.user
-
             // 1. Criar Preferência no Mercado Pago (Centralizado)
             const preference = await createPaymentPreference({
                 clientEmail: user.email,
@@ -60,6 +74,7 @@ export default function PaymentPage() {
                     provider_id: providerId,
                     client_id: user.id,
                     quote_id: quoteId || '',
+                    service_quote_id: serviceQuoteId || '',
                     amount: amount,
                     service_name: 'Limpeza/Serviço especial'
                 }
