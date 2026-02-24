@@ -324,15 +324,25 @@ export default function ProviderRegister() {
             addLog('Salvando dados no sistema...')
             const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
 
+            // Função helper para timeout no DB
+            const dbRace = (promise) => Promise.race([
+                promise,
+                new Promise((_, rej) => setTimeout(() => rej(new Error('Sincronização lenta (Timeout 10s)')), 10000))
+            ])
+
             addLog('Sincronizando perfil...')
-            await supabase.from('profiles').upsert({
-                id: userId,
-                full_name: form.responsible_name,
-                role: 'provider'
-            })
+            try {
+                await dbRace(supabase.from('profiles').upsert({
+                    id: userId,
+                    full_name: form.responsible_name,
+                    role: 'provider'
+                }))
+            } catch (err) {
+                addLog(`Aviso Perfil: ${err.message}. Continuando...`)
+            }
 
             addLog('Finalizando dados profissionais...')
-            const { error: spErr } = await supabase.from('service_providers').upsert({
+            const { error: spErr } = await dbRace(supabase.from('service_providers').upsert({
                 user_id: userId,
                 legal_name: form.legal_name,
                 trade_name: form.trade_name || form.legal_name,
@@ -349,11 +359,11 @@ export default function ProviderRegister() {
                 services_offered: form.services_offered,
                 profile_image: profileUrl,
                 logo_image: logoUrl,
-                portfolio_images: portfolioUrls.filter(u => u !== null),
+                portfolio_images: (portfolioUrls || []).filter(u => u !== null),
                 pix_key: form.pix_key,
                 referral_code: newReferralCode,
                 status: 'approved'
-            }, { onConflict: 'user_id' })
+            }, { onConflict: 'user_id' }))
 
             if (spErr) {
                 addLog(`ERRO BANCO: ${spErr.message}`)
@@ -754,6 +764,20 @@ export default function ProviderRegister() {
                                         <span className="text-[10px] text-gray-500 font-medium">Adicionar</span>
                                     </label>
                                 </div>
+                            </div>
+
+                            {/* Skip Hint */}
+                            <div className="bg-green/5 border border-green/10 rounded-xl p-4 mt-6 flex items-center justify-between">
+                                <span className="text-sm text-green/70">
+                                    <strong>Dica:</strong> Você pode pular as fotos agora e completá-las depois.
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => nextStep()}
+                                    className="text-green font-bold text-sm hover:underline flex items-center gap-1"
+                                >
+                                    Pular por enquanto <ChevronRight className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     )}
