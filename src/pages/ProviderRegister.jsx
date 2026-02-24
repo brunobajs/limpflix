@@ -143,6 +143,41 @@ export default function ProviderRegister() {
         }))
     }
 
+    // Função par comprimir imagem no cliente (Canvas)
+    const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+            reader.onload = (event) => {
+                const img = new Image()
+                img.src = event.target.result
+                img.onload = () => {
+                    const canvas = document.createElement('canvas')
+                    let width = img.width
+                    let height = img.height
+
+                    if (width > maxWidth) {
+                        height = (maxWidth / width) * height
+                        width = maxWidth
+                    }
+
+                    canvas.width = width
+                    canvas.height = height
+                    const ctx = canvas.getContext('2d')
+                    ctx.drawImage(img, 0, 0, width, height)
+
+                    canvas.toBlob((blob) => {
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now(),
+                        })
+                        resolve(compressedFile)
+                    }, 'image/jpeg', quality)
+                }
+            }
+        })
+    }
+
     async function getCoordinates() {
         console.log("Debug - Início getCoordinates")
         // Se já capturou manualmente, retorna elas
@@ -179,23 +214,20 @@ export default function ProviderRegister() {
     async function uploadMedia(file, folder) {
         if (!file) return null
 
-        // Timeout de 30 segundos para garantir o envio em conexões lentas
-        const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Tempo esgotado no envio da imagem (30s)')), 30000)
-        )
-
         try {
-            const fileExt = file.name.split('.').pop()
+            // Comprimir antes de enviar
+            const compressed = (file instanceof File) ? await compressImage(file) : file
+            if (!(compressed instanceof File)) return file
+
+            const fileExt = compressed.name.split('.').pop()
             const fileName = `${Math.random()}.${fileExt}`
             const filePath = `${folder}/${fileName}`
 
-            console.log(`Iniciando upload para ${filePath}...`)
+            console.log(`Uploading ${filePath}...`)
 
-            const uploadTask = supabase.storage
+            const { error: uploadError } = await supabase.storage
                 .from('providers-media')
-                .upload(filePath, file)
-
-            const { error: uploadError } = await Promise.race([uploadTask, timeout])
+                .upload(filePath, compressed)
 
             if (uploadError) throw uploadError
 
@@ -205,8 +237,7 @@ export default function ProviderRegister() {
 
             return data.publicUrl
         } catch (err) {
-            console.error('Upload error (continuing without image):', err)
-            window.alert('AVISO: Não conseguimos salvar uma das fotos (talvez seja muito grande ou a internet falhou), mas vamos continuar o cadastro sem ela.')
+            console.error('Upload fail:', err)
             return null
         }
     }
@@ -214,95 +245,44 @@ export default function ProviderRegister() {
     async function handleSubmit() {
         setError('')
         setLoading(true)
-        setRegistrationStatus('Iniciando...')
-        window.alert('PASSO 1: Início (Survival Mode)')
+        setRegistrationStatus('Iniciando processamento otimizado...')
 
         try {
-            // 1. Identificar Usuário
+            // 1. Auth/User ID
             let userId = user?.id
-            window.alert(`PASSO 1.1: ID Atual: ${userId || 'Nenhum'}`)
-
             if (!userId) {
-                window.alert('PASSO 1.2: Tentando Criar Conta (signUp)...')
+                setRegistrationStatus('Criando sua conta de acesso...')
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
                     password: form.password,
                     options: { data: { full_name: form.responsible_name } }
                 })
-
-                if (signUpError) {
-                    window.alert(`ERRO no signUp: ${signUpError.message}`)
-                    throw signUpError
-                }
+                if (signUpError) throw signUpError
                 userId = signUpData?.user?.id
-                window.alert(`PASSO 1.3: Conta Criada ID: ${userId}`)
-
-                if (!userId) {
-                    window.alert('PASSO 1.4: Usuário pendente, buscando sessão...')
-                    const { data: sData } = await supabase.auth.getSession()
-                    userId = sData?.session?.user?.id
-                }
             }
+            if (!userId) throw new Error('Não foi possível identificar o usuário.')
 
-            if (!userId) throw new Error('Não foi possível obter um ID de usuário.')
+            // 2. Processamento em Paralelo (Alta Performance)
+            setRegistrationStatus('Preparando fotos e localização...')
 
-            // 2. Coordenadas (COM TIMEOUT SEVERO)
-            window.alert('PASSO 2: Buscando localização (Timeout 3s)...')
-            let coords = { latitude: -23.5505, longitude: -46.6333 }
-            try {
-                coords = await getCoordinates()
-                window.alert('PASSO 2.1: Localização OK')
-            } catch (gErr) {
-                window.alert('PASSO 2.2: Erro no GPS (ignorando): ' + gErr.message)
-            }
+            const [profileUrl, logoUrl, portfolioUrls, coords] = await Promise.all([
+                uploadMedia(form.profile_image, 'profiles'),
+                uploadMedia(form.logo_image, 'logos'),
+                Promise.all(form.portfolio_images.map(img => uploadMedia(img, 'portfolio'))),
+                getCoordinates()
+            ])
 
-            // 3. Uploads (UM POR UM COM ALERTA)
-            window.alert('PASSO 3: Enviando Imagens...')
-            let profileUrl = form.profile_image
-            let logoUrl = form.logo_image
-            let portfolioUrls = []
-
-            try {
-                if (form.profile_image instanceof File) {
-                    window.alert('PASSO 3.1: Enviando Foto Perfil...')
-                    profileUrl = await uploadMedia(form.profile_image, 'profiles')
-                    window.alert('PASSO 3.1: OK')
-                }
-                if (form.logo_image instanceof File) {
-                    window.alert('PASSO 3.2: Enviando Logo...')
-                    logoUrl = await uploadMedia(form.logo_image, 'logos')
-                    window.alert('PASSO 3.2: OK')
-                }
-                if (form.portfolio_images.length > 0) {
-                    window.alert(`PASSO 3.3: Enviando ${form.portfolio_images.length} fotos portfólio...`)
-                    for (const img of form.portfolio_images) {
-                        if (img instanceof File) {
-                            const url = await uploadMedia(img, 'portfolio')
-                            portfolioUrls.push(url)
-                        } else {
-                            portfolioUrls.push(img)
-                        }
-                    }
-                    window.alert('PASSO 3.3: OK')
-                }
-            } catch (uErr) {
-                window.alert('ERRO no Upload (ignorando para salvar dados): ' + uErr.message)
-            }
-
-            // 4. Salvar no Banco (FINAL)
-            window.alert('PASSO 4: Salvando no Banco de Dados...')
+            // 3. Salvar no Banco
+            setRegistrationStatus('Salvando seus dados...')
             const newReferralCode = generateReferralCode(form.legal_name || form.responsible_name)
 
-            // Perfil
-            const { error: pErr } = await supabase.from('profiles').upsert({
+            // Upsert Profile e Provider em sequência garantida
+            await supabase.from('profiles').upsert({
                 id: userId,
                 full_name: form.responsible_name,
                 role: 'provider'
             })
-            if (pErr) window.alert('Erro Perfil: ' + pErr.message)
 
-            // Prestador
-            window.alert('PASSO 4.1: Upsert service_providers...')
             const { error: spErr } = await supabase.from('service_providers').upsert({
                 user_id: userId,
                 legal_name: form.legal_name,
@@ -318,33 +298,23 @@ export default function ProviderRegister() {
                 latitude: coords.latitude,
                 longitude: coords.longitude,
                 services_offered: form.services_offered,
-                profile_image: typeof profileUrl === 'string' ? profileUrl : null,
-                logo_image: typeof logoUrl === 'string' ? logoUrl : null,
-                portfolio_images: portfolioUrls,
+                profile_image: profileUrl,
+                logo_image: logoUrl,
+                portfolio_images: portfolioUrls.filter(u => u !== null),
                 pix_key: form.pix_key,
                 referral_code: newReferralCode,
                 status: 'approved'
             }, { onConflict: 'user_id' })
 
-            if (spErr) {
-                window.alert('ERRO DATABASE: ' + spErr.message)
-                throw spErr
-            }
+            if (spErr) throw spErr
 
-            window.alert('PASSO 5: SUCESSO! Finalizando...')
+            setRegistrationStatus('Sucesso! Redirecionando...')
             if (refreshProfile) await refreshProfile()
             navigate('/dashboard?welcome=true')
 
         } catch (err) {
-            let userMessage = 'Falha crítica no cadastro: ' + err.message
-            // Erro específico de "Foreign Key" sugere sessão fantasma
-            if (err.message?.includes('foreign key constraint') && err.message?.includes('user_id')) {
-                userMessage = 'Erro de sincronização de conta. Por favor, saia da conta atual (Logout) e tente novamente em uma janela anônima.'
-                // Opcional: Forçar logout técnico para limpar a sessão fantasma
-                supabase.auth.signOut().then(() => console.log("Sessão limpa após erro de FK"))
-            }
-
-            setError(userMessage)
+            console.error('Registration failed:', err)
+            setError('Falha no cadastro: ' + (err.message || 'Erro desconhecido'))
         } finally {
             setLoading(false)
         }
