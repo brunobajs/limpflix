@@ -300,72 +300,73 @@ export default function ProviderRegister() {
             // A PARTIR DAQUI, O USUÁRIO JÁ TEM CONTA.
             // Vamos tentar sincronizar o banco, mas se demorar, não vamos travar a vida dele.
 
-            const dbRace = (promise, name) => Promise.race([
-                promise,
-                new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout 5s')), 5000))
-            ])
-
             // Sincronia de Localização (Rápido)
             addLog('Capturando localização...')
             const coords = await getCoordinates()
             addLog(`Localização: ${coords.latitude.toFixed(2)}`)
 
-            // Passo A: Atualizar Perfil para 'provider'
-            addLog('Sincronizando Perfil (Passo A)...')
-            try {
-                await dbRace(supabase.from('profiles').upsert({
-                    id: userId,
-                    full_name: form.responsible_name,
-                    role: 'provider'
-                }), 'Perfil')
-                addLog('✓ Perfil Sincronizado')
-            } catch (err) {
-                addLog(`⚠️ Perfil lento (${err.message}). O sistema sincronizará em breve.`)
+            // Passo A & B: Sincronização Atômica via RPC
+            addLog('Sincronizando dados (Modo Atômico)...')
+            const { error: rpcError } = await supabase.rpc('register_provider_v3', {
+                p_user_id: userId,
+                p_legal_name: form.legal_name,
+                p_trade_name: form.trade_name || form.legal_name,
+                p_cnpj: form.cnpj,
+                p_bio: form.bio,
+                p_responsible_name: form.responsible_name,
+                p_phone: form.phone,
+                p_email: form.email,
+                p_address: form.address,
+                p_city: form.city,
+                p_state: form.state,
+                p_latitude: coords.latitude,
+                p_longitude: coords.longitude,
+                p_services_offered: form.services_offered,
+                p_profile_image: form.profile_image || '',
+                p_logo_image: form.logo_image || '',
+                p_portfolio_images: form.portfolio_images || [],
+                p_pix_key: form.pix_key,
+                p_referral_code: generateReferralCode(form.legal_name || form.responsible_name),
+                p_referrer_id: null // Pode ser expandido futuramente
+            })
+
+            if (rpcError) {
+                addLog(`⚠️ Erro na sincronização: ${rpcError.message}`)
+                console.error('RPC Error:', rpcError)
+
+                // Fallback de emergência (Legado v7) se o RPC falhar por falta de constraint
+                if (rpcError.message.includes('unique')) {
+                    addLog('Tentando fallback de salvamento direto...')
+                    await supabase.from('profiles').upsert({ id: userId, full_name: form.responsible_name, role: 'provider' })
+                    await supabase.from('service_providers').insert({
+                        user_id: userId,
+                        legal_name: form.legal_name,
+                        trade_name: form.trade_name || form.legal_name,
+                        cnpj: form.cnpj,
+                        bio: form.bio,
+                        responsible_name: form.responsible_name,
+                        phone: form.phone,
+                        email: form.email,
+                        city: form.city,
+                        state: form.state,
+                        latitude: coords.latitude,
+                        longitude: coords.longitude,
+                        services_offered: form.services_offered,
+                        pix_key: form.pix_key,
+                        status: 'approved'
+                    })
+                } else {
+                    throw new Error(`Falha no registro: ${rpcError.message}`)
+                }
             }
 
-            // Passo B: Dados Profissionais
-            addLog('Sincronizando Profissional (Passo B)...')
-            try {
-                const spPayload = {
-                    user_id: userId,
-                    legal_name: form.legal_name,
-                    trade_name: form.trade_name || form.legal_name,
-                    cnpj: form.cnpj,
-                    bio: form.bio,
-                    responsible_name: form.responsible_name,
-                    phone: form.phone,
-                    email: form.email,
-                    city: form.city,
-                    state: form.state,
-                    latitude: coords.latitude,
-                    longitude: coords.longitude,
-                    services_offered: form.services_offered,
-                    pix_key: form.pix_key,
-                    referral_code: generateReferralCode(form.legal_name || form.responsible_name),
-                    status: 'approved'
-                }
-
-                const { error: spErr } = await dbRace(
-                    supabase.from('service_providers').upsert(spPayload, { onConflict: 'user_id' }),
-                    'Profissional'
-                )
-
-                if (spErr) {
-                    addLog('Tentando via inserção direta...')
-                    await supabase.from('service_providers').insert(spPayload)
-                }
-                addLog('✓ Profissional Sincronizado')
-            } catch (err) {
-                addLog(`⚠️ Banco ocupado (${err.message}). Finalizando mesmo assim...`)
-            }
-
-            addLog('SUCESSO! Redirecionando para o Dashboard...')
+            addLog('✓ Tudo sincronizado com sucesso!')
+            addLog('Redirecionando para o Dashboard...')
             if (refreshProfile) await refreshProfile()
 
-            // Redireciona rápido
             setTimeout(() => {
                 navigate('/dashboard?welcome=true')
-            }, 800)
+            }, 1000)
 
         } catch (err) {
             addLog(`ERRO: ${err.message}`)
