@@ -8,7 +8,7 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User
+    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
 import ChatWindow from '../components/ChatWindow'
@@ -215,9 +215,6 @@ export default function ProviderDashboard() {
 
             const providerData = providers?.[0] || null
 
-            console.log("Dashboard Debug - User ID:", user.id)
-            console.log("Dashboard Debug - Provider Data found:", providerData)
-
             setProvider(providerData)
             setEditForm(providerData || {})
 
@@ -363,6 +360,14 @@ export default function ProviderDashboard() {
                 ? await uploadMedia(editForm.logo_image_file, 'logos')
                 : editForm.logo_image
 
+            // Portfolio: upload novas imagens e manter as existentes (strings)
+            let portfolioUrls = (editForm.portfolio_images || []).filter(img => typeof img === 'string')
+            const portfolioFiles = (editForm.portfolio_images || []).filter(img => img instanceof File)
+            for (const pFile of portfolioFiles) {
+                const url = await uploadMedia(pFile, 'portfolio')
+                if (url) portfolioUrls.push(url)
+            }
+
             const { error } = await supabase
                 .from('service_providers')
                 .update({
@@ -375,6 +380,7 @@ export default function ProviderDashboard() {
                     services_offered: editForm.services_offered,
                     profile_image: profileUrl,
                     logo_image: logoUrl,
+                    portfolio_images: portfolioUrls,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', provider.id)
@@ -454,6 +460,7 @@ export default function ProviderDashboard() {
         { id: 'referrals', label: 'Indicações', icon: Users },
         { id: 'messages', label: 'Mensagens', icon: MessageSquare },
         { id: 'settings', label: 'Configurações', icon: Settings },
+        { id: 'verification', label: 'Verificações', icon: Shield },
     ]
 
     const stats = [
@@ -1006,6 +1013,61 @@ export default function ProviderDashboard() {
                                             )}
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Portfolio Section */}
+                            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+                                    <Image className="w-5 h-5 text-green" />
+                                    Portfólio de Serviços
+                                </h3>
+                                <p className="text-xs text-gray-500 mb-4">Adicione fotos dos seus trabalhos para atrair mais clientes. Máximo de 6 imagens.</p>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {(editForm.portfolio_images || []).map((img, idx) => (
+                                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border-2 border-gray-200">
+                                            <img
+                                                src={img instanceof File ? URL.createObjectURL(img) : img}
+                                                alt={`Portfólio ${idx + 1}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            {isEditing && (
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = [...(editForm.portfolio_images || [])]
+                                                        updated.splice(idx, 1)
+                                                        setEditForm({ ...editForm, portfolio_images: updated })
+                                                    }}
+                                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {isEditing && (editForm.portfolio_images || []).length < 6 && (
+                                        <label className="aspect-square rounded-xl border-2 border-dashed border-gray-300 hover:border-green hover:bg-green/5 flex flex-col items-center justify-center cursor-pointer transition-all">
+                                            <Plus className="w-6 h-6 text-gray-400" />
+                                            <span className="text-xs text-gray-400 mt-1">Adicionar</span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                multiple
+                                                onChange={e => {
+                                                    const files = Array.from(e.target.files || [])
+                                                    const curr = editForm.portfolio_images || []
+                                                    const remaining = 6 - curr.length
+                                                    setEditForm({ ...editForm, portfolio_images: [...curr, ...files.slice(0, remaining)] })
+                                                }}
+                                            />
+                                        </label>
+                                    )}
+                                    {!isEditing && (editForm.portfolio_images || []).length === 0 && (
+                                        <div className="col-span-3 text-center py-8 text-gray-400 text-sm">
+                                            Nenhuma foto de portfólio adicionada ainda.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

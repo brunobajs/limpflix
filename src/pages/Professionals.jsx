@@ -39,6 +39,7 @@ export default function Professionals() {
     const [geoLoading, setGeoLoading] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
     const [viewMode, setViewMode] = useState('list')
+    const [onlyAvailable, setOnlyAvailable] = useState(false)
 
     useEffect(() => {
         const refCode = searchParams.get('ref')
@@ -118,7 +119,9 @@ export default function Professionals() {
         const matchService = !serviceFilter ||
             pServices.some(s => s.toLowerCase().includes(serviceFilter.toLowerCase()))
 
-        return matchSearch && matchCity && matchService
+        const matchAvailable = !onlyAvailable || !p.is_busy
+
+        return matchSearch && matchCity && matchService && matchAvailable
     })
 
     if (userLocation && sortBy === 'distance') {
@@ -230,6 +233,18 @@ export default function Professionals() {
                                     <option value="distance">Mais próximo</option>
                                 </select>
                             </div>
+                            {/* Filtro de disponibilidade */}
+                            <button
+                                onClick={() => setOnlyAvailable(prev => !prev)}
+                                className={`mt-3 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                                    onlyAvailable
+                                        ? 'bg-green text-white border-green'
+                                        : 'bg-white/80 text-white/80 border-white/30 hover:bg-white/20'
+                                }`}
+                            >
+                                <span className={`w-2 h-2 rounded-full ${onlyAvailable ? 'bg-white' : 'bg-green'}`} />
+                                {onlyAvailable ? 'Mostrando apenas disponíveis' : 'Mostrar apenas disponíveis'}
+                            </button>
                         </div>
                     )}
                 </div>
@@ -380,9 +395,18 @@ function ProviderCard({ provider }) {
 
                 {/* CTA */}
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                    <div className="flex items-center gap-1.5 text-gray-400 text-xs">
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>{provider.total_services || 0} serviços realizados</span>
+                    <div className="flex items-center gap-1.5">
+                        {provider.is_busy ? (
+                            <span className="flex items-center gap-1 text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                Ocupado
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1 text-xs font-bold text-green bg-green/10 px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green" />
+                                Disponível
+                            </span>
+                        )}
                     </div>
                     <span className="flex items-center gap-1 text-green text-sm font-semibold group-hover:translate-x-1 transition-transform">
                         Ver perfil

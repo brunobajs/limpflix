@@ -37,8 +37,8 @@ export default function AdminDashboard() {
         }
 
         if (authProfile?.role !== 'admin') {
-            console.log('User is not admin, but allowing for dev')
-            // navigate('/')
+            console.warn('Acesso negado: usuário não é admin.')
+            navigate('/')
         }
     }
 

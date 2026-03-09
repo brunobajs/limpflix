@@ -32,8 +32,26 @@ export default function ClientDashboard() {
     useEffect(() => {
         if (selectedChat) {
             loadMessages(selectedChat.id)
-            const interval = setInterval(() => loadMessages(selectedChat.id), 3000)
-            return () => clearInterval(interval)
+
+            // Real-time subscription — sem polling!
+            const channel = supabase
+                .channel(`client-chat:${selectedChat.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'chat_messages',
+                        filter: `conversation_id=eq.${selectedChat.id}`
+                    },
+                    (payload) => {
+                        setMessages(prev => [...prev, payload.new])
+                        scrollToBottom()
+                    }
+                )
+                .subscribe()
+
+            return () => supabase.removeChannel(channel)
         }
     }, [selectedChat])
 
@@ -43,6 +61,23 @@ export default function ClientDashboard() {
             return
         }
         loadChats(user.id)
+        loadPendingQuotes(user.id)
+    }
+
+    const [pendingQuotes, setPendingQuotes] = useState([])
+
+    async function loadPendingQuotes(userId) {
+        const { data } = await supabase
+            .from('service_quotes')
+            .select(`
+                *,
+                provider:service_providers(trade_name, responsible_name, profile_image)
+            `)
+            .eq('status', 'pending')
+            // O ideal seria filtrar por client_id através da conversation_id
+            .order('created_at', { ascending: false })
+        
+        setPendingQuotes(data || [])
     }
 
     async function loadChats(userId) {
@@ -224,6 +259,37 @@ export default function ClientDashboard() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
+            {/* Orçamentos Pendentes (Recuperação) */}
+            {pendingQuotes.length > 0 && (
+                <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between overflow-x-auto gap-4">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
+                        <span className="text-amber-900 font-bold text-sm">Você tem {pendingQuotes.length} orçamento(s) aguardando pagamento:</span>
+                    </div>
+                    <div className="flex gap-3">
+                        {pendingQuotes.map(quote => (
+                            <div 
+                                key={quote.id}
+                                onClick={() => {
+                                    const chat = chats.find(c => c.id === quote.conversation_id)
+                                    if(chat) setSelectedChat(chat)
+                                }}
+                                className="bg-white px-4 py-2 rounded-xl shadow-sm border border-amber-200 flex items-center gap-3 cursor-pointer hover:scale-105 transition-all flex-shrink-0"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden">
+                                     <img src={quote.provider?.profile_image} className="w-full h-full object-cover" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-500 font-bold leading-none">{quote.provider?.trade_name || 'Profissional'}</p>
+                                    <p className="text-sm font-bold text-green">R$ {quote.amount.toFixed(2)}</p>
+                                </div>
+                                <ArrowRight className="w-4 h-4 text-amber-500" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">

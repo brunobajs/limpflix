@@ -274,10 +274,12 @@ export default function ProviderRegister() {
 
         try {
             // 1. GARANTE A CONTA (AUTH)
+            setRegistrationStatus('Verificando conta...')
             let userId = user?.id
             if (userId) addLog(`Utilizando conta logada: ${userId.slice(0, 8)}...`)
 
             if (!userId) {
+                setRegistrationStatus('Criando sua conta...')
                 addLog('Criando conta de acesso...')
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
@@ -305,7 +307,21 @@ export default function ProviderRegister() {
             const coords = await getCoordinates()
             addLog(`Localização: ${coords.latitude.toFixed(2)}`)
 
+            // Passo Extra: Upload de Media (Se houver arquivos pendentes)
+            setRegistrationStatus('Enviando fotos de perfil...')
+            let profileUrl = form.profile_image
+            let logoUrl = form.logo_image
+            
+            // Caso sejam arquivos (Files), fazemos o upload antes do RPC
+            if (form.profile_image instanceof File) {
+                profileUrl = await uploadMedia(form.profile_image, 'profiles')
+            }
+            if (form.logo_image instanceof File) {
+                logoUrl = await uploadMedia(form.logo_image, 'logos')
+            }
+
             // Passo A & B: Sincronização Atômica via RPC
+            setRegistrationStatus('Salvando seus dados...')
             addLog('Sincronizando dados (Modo Atômico)...')
             const { error: rpcError } = await supabase.rpc('register_provider_v3', {
                 p_user_id: userId,
@@ -322,8 +338,8 @@ export default function ProviderRegister() {
                 p_latitude: coords.latitude,
                 p_longitude: coords.longitude,
                 p_services_offered: form.services_offered,
-                p_profile_image: form.profile_image || '',
-                p_logo_image: form.logo_image || '',
+                p_profile_image: profileUrl || '',
+                p_logo_image: logoUrl || '',
                 p_portfolio_images: form.portfolio_images || [],
                 p_pix_key: form.pix_key,
                 p_referral_code: generateReferralCode(form.legal_name || form.responsible_name),
@@ -370,9 +386,11 @@ export default function ProviderRegister() {
 
         } catch (err) {
             addLog(`ERRO: ${err.message}`)
+            setRegistrationStatus('Ocorreu um erro')
             setError(err.message || 'Erro inesperado no cadastro')
         } finally {
             setLoading(false)
+            setRegistrationStatus('')
         }
     }
 
@@ -477,22 +495,11 @@ export default function ProviderRegister() {
                         </div>
                     )}
 
-                    {/* Diagnostic Console */}
-                    {debugLog.length > 0 && (
-                        <div className="bg-navy/5 border border-navy/10 rounded-xl p-3 mb-6 font-mono text-xs">
-                            <div className="text-navy/50 mb-2 uppercase text-[10px] tracking-wider font-bold italic">Console de Diagnóstico Vital:</div>
-                            {debugLog.map((log, i) => (
-                                <div key={i} className="flex gap-2 text-navy/80">
-                                    <span className="text-navy/30">[{i + 1}]</span>
-                                    <span>{log}</span>
-                                </div>
-                            ))}
-                            {loading && (
-                                <div className="mt-2 flex items-center gap-2 text-green">
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    <span>Processando etapa atual...</span>
-                                </div>
-                            )}
+                    {/* Loading status durante o envio */}
+                    {loading && (
+                        <div className="bg-green/5 border border-green/10 rounded-xl p-3 mb-6 flex items-center gap-3 text-sm text-green">
+                            <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                            <span>Processando seu cadastro, aguarde...</span>
                         </div>
                     )}
 

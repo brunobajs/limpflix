@@ -109,16 +109,25 @@ export default function ProviderProfile() {
                         <div className="flex flex-col gap-2">
                             <a
                                 href={`tel:${provider.phone || ''}`}
-                                className="inline-flex items-center gap-2 bg-green hover:bg-green-dark text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105"
+                                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105"
                             >
                                 <Phone className="w-5 h-5" />
                                 Ligar
                             </a>
-                            <Link
-                                to={`/solicitar-orcamento?profissional=${provider.id}`}
-                                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20"
+                            <a
+                                href={`https://wa.me/${provider.phone?.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(provider.trade_name || provider.responsible_name)}!%20Vi%20seu%20perfil%20na%20LimpFlix%20e%20gostaria%20de%20um%20orçamento.`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105"
                             >
                                 <MessageCircle className="w-5 h-5" />
+                                WhatsApp
+                            </a>
+                            <Link
+                                to={`/solicitar-orcamento?profissional=${provider.id}`}
+                                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
+                            >
+                                <Calendar className="w-5 h-5" />
                                 Orçamento
                             </Link>
                         </div>
