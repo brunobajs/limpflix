@@ -8,7 +8,7 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus
+    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
 import ChatWindow from '../components/ChatWindow'
@@ -26,6 +26,32 @@ const STATES = [
     'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'
 ]
 
+import React from 'react'
+class LocalErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props)
+        this.state = { hasError: false, error: null }
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error }
+    }
+    componentDidCatch(error, errorInfo) {
+        console.error("Dashboard component crash:", error, errorInfo)
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="p-8 bg-red-50 text-red-800 rounded-2xl border border-red-100">
+                    <h2 className="font-bold mb-2">Ops! Algo deu errado nesta parte.</h2>
+                    <p className="text-xs opacity-70 mb-4">{this.state.error?.message}</p>
+                    <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm">Recarregar</button>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
+
 export default function ProviderDashboard() {
     const { user, loading: authLoading, signOut, refreshProfile } = useAuth()
     const navigate = useNavigate()
@@ -40,6 +66,17 @@ export default function ProviderDashboard() {
     const [activeTab, setActiveTab] = useState('overview')
     const [showWelcome, setShowWelcome] = useState(searchParams.get('welcome') === 'true')
     const [copied, setCopied] = useState(false)
+    const [renderError, setRenderError] = useState(null)
+
+    // Log states to help debug
+    console.log('ProviderDashboard State:', { 
+        hasUser: !!user, 
+        authLoading, 
+        hasProvider: !!provider, 
+        loading, 
+        activeTab, 
+        showWelcome 
+    })
 
     // Form State (Settings)
     const [isEditing, setIsEditing] = useState(false)
@@ -418,7 +455,7 @@ export default function ProviderDashboard() {
     function copyReferralLink(type) {
         const link = type === 'provider'
             ? `${window.location.origin}/cadastro-profissional?ref=${provider?.referral_code}`
-            : `${window.location.origin}/profissionais?ref=${provider?.referral_code}`;
+            : `${window.location.origin}/login?ref=${provider?.referral_code}`;
         navigator.clipboard.writeText(link)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
@@ -426,6 +463,17 @@ export default function ProviderDashboard() {
 
     function futureFeatureAlert() {
         alert('Esta funcionalidade está em fase de desenvolvimento e estará disponível em breve!')
+    }
+
+    if (renderError) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-red-50 text-red-800">
+                <AlertCircle className="w-12 h-12 mb-4" />
+                <h2 className="text-xl font-bold mb-2">Erro ao carregar painel</h2>
+                <p className="text-sm opacity-80 mb-4">{renderError}</p>
+                <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold"> Recarregar </button>
+            </div>
+        )
     }
 
     if (loading) {
@@ -464,10 +512,10 @@ export default function ProviderDashboard() {
     ]
 
     const stats = [
-        { label: 'Serviços Realizados', value: provider.total_services || 0, icon: TrendingUp, color: 'from-blue-500 to-blue-600' },
-        { label: 'Avaliação Média', value: provider.rating?.toFixed(1) || '5.0', icon: Award, color: 'from-yellow-500 to-yellow-600' },
-        { label: 'Avaliações', value: provider.total_reviews || 0, icon: Star, color: 'from-purple-500 to-purple-600' },
-        { label: 'Lucro Líquido', value: `R$ ${(provider.wallet_balance || 0).toFixed(2)}`, icon: DollarSign, color: 'from-green to-emerald-600' },
+        { label: 'Serviços Realizados', value: provider?.total_services || 0, icon: TrendingUp, color: 'from-blue-500 to-blue-600' },
+        { label: 'Avaliação Média', value: provider?.rating?.toFixed(1) || '5.0', icon: Award, color: 'from-yellow-500 to-yellow-600' },
+        { label: 'Avaliações', value: provider?.total_reviews || 0, icon: Star, color: 'from-purple-500 to-purple-600' },
+        { label: 'Lucro Líquido', value: `R$ ${(provider?.wallet_balance || 0).toFixed(2)}`, icon: DollarSign, color: 'from-green to-emerald-600' },
     ]
 
     const BookingCard = ({ booking, showActions = true }) => (
@@ -537,7 +585,8 @@ export default function ProviderDashboard() {
     )
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <LocalErrorBoundary>
+            <div className="min-h-screen bg-gray-50">
             {/* Welcome modal */}
             {showWelcome && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -547,7 +596,7 @@ export default function ProviderDashboard() {
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">Bem-vindo à LimpFlix! 🎉</h2>
                         <p className="text-gray-600 mb-6">Seu cadastro foi realizado com sucesso. Agora seus clientes podem encontrar você!</p>
-                        {provider.referral_code && (
+                        {provider?.referral_code && (
                             <div className="bg-gray-50 rounded-xl p-4 mb-4">
                                 <p className="text-sm text-gray-500 mb-2">Seu código de indicação:</p>
                                 <div className="flex items-center justify-center gap-2">
@@ -572,18 +621,18 @@ export default function ProviderDashboard() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-green rounded-xl flex items-center justify-center text-white font-bold">
-                            {(provider.trade_name || provider.responsible_name || '?')[0].toUpperCase()}
+                            {(provider?.trade_name || provider?.responsible_name || '?')[0].toUpperCase()}
                         </div>
                         <div>
-                            <h1 className="text-white font-bold">{provider.trade_name || provider.responsible_name}</h1>
-                            <p className="text-white/50 text-xs">Dashboard do Profissional</p>
+                            <h1 className="text-white font-bold">{provider?.trade_name || provider?.responsible_name || 'Profissional'}</h1>
+                            <p className="text-white/50 text-xs text-left">Dashboard do Profissional</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${provider.is_busy ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green/20 text-green border border-green/30'
+                        <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${provider?.is_busy ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green/20 text-green border border-green/30'
                             }`}>
-                            <span className={`w-2 h-2 rounded-full ${provider.is_busy ? 'bg-red-500' : 'bg-green'}`}></span>
-                            {provider.is_busy ? 'Ocupado' : 'Disponível'}
+                            <span className={`w-2 h-2 rounded-full ${provider?.is_busy ? 'bg-red-500' : 'bg-green'}`}></span>
+                            {provider?.is_busy ? 'Ocupado' : 'Disponível'}
                         </div>
                         <button onClick={() => navigate(`/profissional/${provider.id}`)}
                             className="text-white/60 hover:text-white text-sm flex items-center gap-1 transition-colors">
@@ -657,7 +706,7 @@ export default function ProviderDashboard() {
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-lg font-bold text-gray-900">Últimos Agendamentos</h2>
-                                <button onClick={() => setActiveTab('bookings')} className="text-green text-sm font-medium hover:underline">
+                                <button onClick={() => { console.log('Navigating to bookings'); setActiveTab('bookings') }} className="text-green text-sm font-medium hover:underline">
                                     Ver todos
                                 </button>
                             </div>
@@ -678,7 +727,7 @@ export default function ProviderDashboard() {
                         </div>
 
                         {/* Quick referral */}
-                        {provider.referral_code && (
+                        {provider?.referral_code && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="bg-gradient-to-br from-navy to-navy-light rounded-2xl p-6 text-white">
                                     <div className="flex items-center gap-3 mb-3">
@@ -875,29 +924,60 @@ export default function ProviderDashboard() {
                 {/* Referrals Tab */}
                 {activeTab === 'referrals' && (
                     <div className="space-y-6 animate-fade-in">
-                        <div className="bg-gradient-to-br from-navy to-navy-light rounded-2xl p-6 text-white">
-                            <h2 className="text-xl font-bold mb-2">Programa de Indicações</h2>
-                            <p className="text-white/70 text-sm mb-4">
-                                Ganhe comissão de 1% sobre cada serviço realizado pelos profissionais que você indicar!
-                            </p>
-                            <div className="bg-white/10 rounded-xl p-4 mb-4">
-                                <p className="text-white/50 text-xs mb-1">Seu código de indicação</p>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-2xl font-bold font-mono">{provider.referral_code}</span>
-                                    <button onClick={copyReferralCode}>
-                                        {copied ? <CheckCircle2 className="w-5 h-5 text-green" /> : <Copy className="w-5 h-5 text-white/60 hover:text-white" />}
-                                    </button>
+                        <div className="bg-gradient-to-br from-navy to-navy-light rounded-2xl p-8 text-white relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-10">
+                                <Users className="w-32 h-32" />
+                            </div>
+                            
+                            <div className="relative z-10">
+                                <h2 className="text-2xl font-bold mb-2">Programa de Indicações LimpFlix</h2>
+                                <p className="text-white/70 text-sm mb-6 max-w-md">
+                                    Indique profissionais ou clientes e ganhe 1% de comissão permanente sobre todos os serviços realizados ou contratados por eles.
+                                </p>
+                                
+                                <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 flex-1 border border-white/10">
+                                        <p className="text-white/50 text-xs mb-1 font-bold uppercase tracking-wider">Seu Código Único</p>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-3xl font-black tracking-widest text-green">{provider.referral_code}</span>
+                                            <button 
+                                                onClick={copyReferralCode}
+                                                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                            >
+                                                {copied ? <CheckCircle2 className="w-6 h-6 text-green" /> : <Copy className="w-6 h-6 text-white/60" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-3 flex-[1.5]">
+                                        <button onClick={() => copyReferralLink('provider')}
+                                            className="bg-green hover:bg-green-dark text-white p-4 rounded-2xl font-bold transition-all flex flex-col items-center justify-center gap-2 text-center group">
+                                            <Building2 className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                                            <span className="text-xs">Indicar Profissional</span>
+                                        </button>
+                                        <button onClick={() => copyReferralLink('client')}
+                                            className="bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl font-bold transition-all flex flex-col items-center justify-center gap-2 text-center group border border-white/10">
+                                            <User className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                                            <span className="text-xs">Indicar Cliente</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <button onClick={copyReferralLink}
-                                className="bg-green hover:bg-green-dark text-white px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2">
-                                <Share2 className="w-5 h-5" />
-                                Copiar Link de Indicação
-                            </button>
                         </div>
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                            <h3 className="font-bold text-gray-900 mb-2">Suas Indicações</h3>
-                            <p className="text-gray-500 text-sm">Total: {provider.total_referrals || 0} profissional(is) indicado(s)</p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                                <p className="text-gray-500 text-xs font-bold uppercase mb-1">Total de Indicados</p>
+                                <p className="text-3xl font-black text-navy">{provider.total_referrals || 0}</p>
+                            </div>
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                                <p className="text-gray-500 text-xs font-bold uppercase mb-1">Bônus Acumulado</p>
+                                <p className="text-3xl font-black text-green">R$ 0,00</p>
+                            </div>
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                                <p className="text-gray-500 text-xs font-bold uppercase mb-1">Status do Programa</p>
+                                <p className="text-xl font-bold text-blue-600">Ativo ✓</p>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1177,5 +1257,6 @@ export default function ProviderDashboard() {
                 )}
             </div>
         </div>
+        </LocalErrorBoundary>
     )
 }

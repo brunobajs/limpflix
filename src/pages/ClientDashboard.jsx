@@ -2,8 +2,34 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
-    Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send
+    Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight
 } from 'lucide-react'
+
+import React from 'react'
+class LocalErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props)
+        this.state = { hasError: false, error: null }
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error }
+    }
+    componentDidCatch(error, errorInfo) {
+        console.error("Client Dashboard component crash:", error, errorInfo)
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="p-8 bg-red-50 text-red-800 rounded-2xl border border-red-100 m-4">
+                    <h2 className="font-bold mb-2">Ops! Algo deu errado no painel do cliente.</h2>
+                    <p className="text-xs opacity-70 mb-4">{this.state.error?.message}</p>
+                    <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Recarregar</button>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
 import { Link, useNavigate } from 'react-router-dom'
 
 export default function ClientDashboard() {
@@ -258,7 +284,8 @@ export default function ClientDashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <LocalErrorBoundary>
+            <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Orçamentos Pendentes (Recuperação) */}
             {pendingQuotes.length > 0 && (
                 <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between overflow-x-auto gap-4">
@@ -531,5 +558,6 @@ export default function ClientDashboard() {
                 </div>
             )}
         </div>
+        </LocalErrorBoundary>
     )
 }

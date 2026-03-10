@@ -21,15 +21,7 @@ const STATES = [
     'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'
 ]
 
-// Gera um código de indicação único baseado no nome + timestamp
-function generateReferralCode(name) {
-    const prefix = (name || 'LIMP')
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, '')
-        .slice(0, 4)
-    const suffix = Math.random().toString(36).toUpperCase().slice(2, 6)
-    return `${prefix}${suffix}`
-}
+// Códigos de indicação agora são gerados no banco (5 dígitos numéricos)
 
 // Aplica máscara de CNPJ: 00.000.000/0000-00
 function maskCNPJ(value) {
@@ -284,7 +276,10 @@ export default function ProviderRegister() {
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: form.email,
                     password: form.password,
-                    options: { data: { full_name: form.responsible_name } }
+                    options: { 
+                        data: { full_name: form.responsible_name },
+                        emailRedirectTo: window.location.origin
+                    }
                 })
                 if (signUpError) {
                     addLog(`ERRO Auth: ${signUpError.message}`)
@@ -320,6 +315,21 @@ export default function ProviderRegister() {
                 logoUrl = await uploadMedia(form.logo_image, 'logos')
             }
 
+            // Passo A: Validar Código de Indicação (se houver)
+            let referrerId = null
+            if (form.referral_code_input.trim()) {
+                setRegistrationStatus('Validando indicação...')
+                const { data: refId } = await supabase.rpc('get_provider_id_by_code', {
+                    p_code: form.referral_code_input.trim()
+                })
+                if (refId) {
+                    referrerId = refId
+                    addLog('✓ Indicação válida encontrada')
+                } else {
+                    addLog('⚠️ Código de indicação não encontrado. Prosseguindo...')
+                }
+            }
+
             // Passo A & B: Sincronização Atômica via RPC
             setRegistrationStatus('Salvando seus dados...')
             addLog('Sincronizando dados (Modo Atômico)...')
@@ -342,8 +352,8 @@ export default function ProviderRegister() {
                 p_logo_image: logoUrl || '',
                 p_portfolio_images: form.portfolio_images || [],
                 p_pix_key: form.pix_key,
-                p_referral_code: generateReferralCode(form.legal_name || form.responsible_name),
-                p_referrer_id: null // Pode ser expandido futuramente
+                p_referral_code: null, // Deixa o banco gerar o novo código de 5 dígitos
+                p_referrer_id: referrerId
             })
 
             if (rpcError) {
@@ -376,13 +386,13 @@ export default function ProviderRegister() {
                 }
             }
 
-            addLog('✓ Tudo sincronizado com sucesso!')
-            addLog('Redirecionando para o Dashboard...')
             if (refreshProfile) await refreshProfile()
-
+            
+            addLog('Redirecionando para o Dashboard...')
+            setRegistrationStatus('Cadastro completo! Entrando...')
             setTimeout(() => {
                 navigate('/dashboard?welcome=true')
-            }, 1000)
+            }, 1500)
 
         } catch (err) {
             addLog(`ERRO: ${err.message}`)
@@ -648,7 +658,7 @@ export default function ProviderRegister() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-blue-900">Você já está logado</p>
-                                        <p className="text-xs text-blue-700">Usaremos sua conta atual (**{user.email}**). Não é necessário criar uma nova senha.</p>
+                                        <p className="text-xs text-blue-700">Usaremos sua conta atual (**{user?.email}**). Não é necessário criar uma nova senha.</p>
                                     </div>
                                 </div>
                             )}

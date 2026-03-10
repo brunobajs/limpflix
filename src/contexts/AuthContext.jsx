@@ -70,12 +70,15 @@ export function AuthProvider({ children }) {
         await loadProfile(user.id)
     }
 
-    async function signUp(email, password, fullName) {
+    async function signUp(email, password, fullName, referralCode = null) {
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-                data: { full_name: fullName },
+                data: { 
+                    full_name: fullName,
+                    referred_by_code: referralCode 
+                },
                 emailRedirectTo: window.location.origin
             }
         })

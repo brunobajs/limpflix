@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Loader2 } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Loader2, Users } from 'lucide-react'
 
 export default function Login() {
     const [isLogin, setIsLogin] = useState(true)
@@ -12,6 +12,8 @@ export default function Login() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
+    const [searchParams] = useSearchParams()
+    const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '')
     const { signIn, signUp } = useAuth()
     const navigate = useNavigate()
 
@@ -22,16 +24,29 @@ export default function Login() {
         setLoading(true)
         try {
             if (isLogin) {
-                await signIn(email, password)
-                navigate('/dashboard')
+                const { user: signedUser } = await signIn(email, password)
+                
+                // Fetch profile to determine redirect
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', signedUser.id)
+                    .single()
+
+                if (profile?.role === 'provider') {
+                    navigate('/dashboard')
+                } else {
+                    navigate('/cliente/dashboard')
+                }
             } else {
                 if (!fullName.trim()) {
                     setError('Preencha seu nome completo.')
                     setLoading(false)
                     return
                 }
-                await signUp(email, password, fullName)
-                setSuccess('Conta criada! Verifique seu email para confirmar.')
+                await signUp(email, password, fullName, referralCode)
+                setSuccess('Conta criada com sucesso! Você já pode entrar.')
+                setIsLogin(true)
             }
         } catch (err) {
             setError(err.message === 'Invalid login credentials'
@@ -106,6 +121,22 @@ export default function Login() {
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
                                         placeholder="Seu nome completo"
+                                        className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green focus:border-transparent transition-all text-gray-800"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {!isLogin && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Código de Indicação (Opcional)</label>
+                                <div className="relative">
+                                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        value={referralCode}
+                                        onChange={(e) => setReferralCode(e.target.value)}
+                                        placeholder="Ex: 12345"
+                                        maxLength={5}
                                         className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green focus:border-transparent transition-all text-gray-800"
                                     />
                                 </div>

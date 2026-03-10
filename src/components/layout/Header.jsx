@@ -75,6 +75,16 @@ export default function Header() {
                                             <LayoutDashboard className="w-4 h-4" />
                                             Dashboard
                                         </Link>
+                                        {profile?.role === 'admin' && (
+                                            <Link
+                                                to="/admin"
+                                                className="flex items-center gap-2 px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 font-bold"
+                                                onClick={() => setDropdownOpen(false)}
+                                            >
+                                                <LayoutDashboard className="w-4 h-4" />
+                                                Painel Admin
+                                            </Link>
+                                        )}
                                         <Link
                                             to="/dashboard?tab=messages"
                                             className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"

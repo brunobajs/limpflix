@@ -6,7 +6,7 @@ import {
     LayoutDashboard, Users, Building2, MapPin,
     TrendingUp, Calendar, Search, Filter,
     Download, ArrowUpRight, Loader2, PieChart,
-    BarChart3, Settings
+    BarChart3, Settings, Star, CheckCircle2
 } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -18,10 +18,17 @@ export default function AdminDashboard() {
         totalClients: 0,
         totalServices: 0,
         totalRevenue: 0,
+        recentBookings: [],
+        financials: {
+            providerShare: 0,
+            platformShare: 0,
+            referralShare: 0,
+        }
     })
     const [cityData, setCityData] = useState([])
     const [recentBookings, setRecentBookings] = useState([])
     const [activeTab, setActiveTab] = useState('overview')
+    const [adminProviders, setAdminProviders] = useState([])
 
     useEffect(() => {
         if (!authLoading) {
@@ -48,25 +55,35 @@ export default function AdminDashboard() {
             // 1. Basic Stats
             const { count: providersCount } = await supabase.from('service_providers').select('*', { count: 'exact', head: true })
             const { count: clientsCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'client')
-            const { data: bookings } = await supabase.from('service_bookings').select('total_amount, status')
+            const { data: bookings } = await supabase.from('service_bookings').select('total_amount, status, amount_provider, amount_platform, amount_referral')
 
-            const totalServices = bookings?.filter(b => b.status === 'completed').length || 0
-            const totalRevenue = bookings?.reduce((acc, current) => acc + (Number(current.total_amount) || 0), 0) || 0
+            const completedBookings = bookings?.filter(b => b.status === 'completed' || b.status === 'confirmed') || []
+            const totalServices = completedBookings.length
+            const totalRevenue = completedBookings.reduce((acc, current) => acc + (Number(current.total_amount) || 0), 0)
+            const providerShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_provider) || 0), 0)
+            const platformShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_platform) || 0), 0)
+            const referralShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_referral) || 0), 0)
 
             setStats({
                 totalProviders: providersCount || 0,
                 totalClients: clientsCount || 0,
                 totalServices,
-                totalRevenue
+                totalRevenue,
+                financials: {
+                    providerShare,
+                    platformShare,
+                    referralShare
+                }
             })
 
-            // 2. City Distribution
-            const { data: providers } = await supabase.from('service_providers').select('city')
+            // 2. City Distribution & Providers List
+            const { data: providers } = await supabase.from('service_providers').select('*').order('created_at', { ascending: false })
+            setAdminProviders(providers || [])
 
             const cityMap = {}
             providers?.forEach(p => {
                 const city = p.city || 'Desconhecido'
-                if (!cityMap[city]) cityMap[city] = { city, providers: 0, services: 0 }
+                if (!cityMap[city]) cityMap[city] = { city, providers: 0, revenue: 0 }
                 cityMap[city].providers++
             })
 
@@ -75,7 +92,7 @@ export default function AdminDashboard() {
                 .from('service_bookings')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(5)
+                .limit(10)
 
             setRecentBookings(recent || [])
             setCityData(Object.values(cityMap).sort((a, b) => b.providers - a.providers))
@@ -108,6 +125,7 @@ export default function AdminDashboard() {
                     {[
                         { id: 'overview', label: 'Estatísticas', icon: LayoutDashboard },
                         { id: 'providers', label: 'Prestadores', icon: Building2 },
+                        { id: 'clients', label: 'Clientes', icon: Users },
                         { id: 'cities', label: 'Cidades', icon: MapPin },
                         { id: 'marketing', label: 'Marketing', icon: TrendingUp },
                         { id: 'settings', label: 'Configurações', icon: Settings },
@@ -176,45 +194,129 @@ export default function AdminDashboard() {
                         ))}
                     </div>
 
-                    {/* Middle Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* City Stats */}
-                        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Distribuição por Cidade</h2>
-                                    <p className="text-sm text-gray-500">Onde o LimpFlix está crescendo</p>
+                    {/* Main Sections */}
+                    {activeTab === 'overview' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* City Stats */}
+                            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div>
+                                        <h2 className="text-lg font-bold text-gray-900">Distribuição por Cidade</h2>
+                                        <p className="text-sm text-gray-500">Onde o LimpFlix está crescendo</p>
+                                    </div>
+                                    <MapPin className="w-5 h-5 text-gray-300" />
                                 </div>
-                                <MapPin className="w-5 h-5 text-gray-300" />
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="text-gray-400 text-xs font-bold border-b border-gray-50">
+                                                <th className="pb-4">CIDADE</th>
+                                                <th className="pb-4">PRESTADORES</th>
+                                                <th className="pb-4">STATUS</th>
+                                                <th className="pb-4 text-right">POTENCIAL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {cityData.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="py-8 text-center text-gray-400">Sem dados suficientes</td>
+                                                </tr>
+                                            ) : cityData.map((item, idx) => (
+                                                <tr key={idx} className="group hover:bg-gray-50 transition-colors">
+                                                    <td className="py-4 font-bold text-navy truncate">{item.city}</td>
+                                                    <td className="py-4">
+                                                        <span className="bg-navy/5 text-navy px-2 py-1 rounded-md text-xs font-bold">{item.providers}</span>
+                                                    </td>
+                                                    <td className="py-4 text-sm text-gray-500">Operando</td>
+                                                    <td className="py-4 text-right">
+                                                        <div className="inline-flex items-center text-green text-xs font-bold gap-1 bg-green/10 px-2 py-1 rounded-md">
+                                                            <ArrowUpRight className="w-3 h-3" />
+                                                            Crescendo
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
+                            {/* Recent Bookings */}
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                                <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                                    <Clock className="w-5 h-5 text-green" />
+                                    Últimos Serviços
+                                </h2>
+                                <div className="space-y-6">
+                                    {recentBookings.length === 0 ? (
+                                        <p className="text-gray-400 text-center py-8">Nenhum agendamento recente</p>
+                                    ) : recentBookings.map((b) => (
+                                        <div key={b.id} className="flex gap-4">
+                                            <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                <BarChart3 className="w-5 h-5 text-gray-400" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-bold text-gray-900 truncate">{b.service_name}</p>
+                                                <p className="text-xs text-gray-500">{b.client_name}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs font-bold text-green">R$ {b.total_amount?.toLocaleString()}</p>
+                                                <p className="text-[10px] text-gray-400">{new Date(b.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'providers' && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-gray-900">Lista de Prestadores</h2>
+                                <span className="text-xs font-bold text-gray-400 uppercase">{adminProviders.length} CADASTRADOS</span>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="text-gray-400 text-xs font-bold border-b border-gray-50">
-                                            <th className="pb-4">CIDADE</th>
-                                            <th className="pb-4">PRESTADORES</th>
-                                            <th className="pb-4">VOLUME (EST.)</th>
-                                            <th className="pb-4 text-right">POTENCIAL</th>
+                                    <thead className="bg-gray-50/50">
+                                        <tr className="text-gray-400 text-[10px] uppercase font-black tracking-wider">
+                                            <th className="px-6 py-4">Nome Profissional</th>
+                                            <th className="px-6 py-4">Cidade</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Avaliação</th>
+                                            <th className="px-6 py-4">Saldo Carteira</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {cityData.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={4} className="py-8 text-center text-gray-400">Sem dados suficientes</td>
-                                            </tr>
-                                        ) : cityData.map((item, idx) => (
-                                            <tr key={idx} className="group hover:bg-gray-50 transition-colors">
-                                                <td className="py-4 font-bold text-navy truncate">{item.city}</td>
-                                                <td className="py-4">
-                                                    <span className="bg-navy/5 text-navy px-2 py-1 rounded-md text-xs font-bold">{item.providers}</span>
-                                                </td>
-                                                <td className="py-4 text-sm text-gray-500">Média Alta</td>
-                                                <td className="py-4 text-right">
-                                                    <div className="inline-flex items-center text-green text-xs font-bold gap-1 bg-green/10 px-2 py-1 rounded-md">
-                                                        <ArrowUpRight className="w-3 h-3" />
-                                                        +12%
+                                        {adminProviders.map(p => (
+                                            <tr key={p.id} className="hover:bg-gray-50/80 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-green/10 flex items-center justify-center text-green font-bold text-xs">
+                                                            {p.trade_name?.charAt(0) || p.responsible_name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-900">{p.trade_name || p.responsible_name}</p>
+                                                            <p className="text-[10px] text-gray-500">{p.email}</p>
+                                                        </div>
                                                     </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 font-medium">{p.city}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${p.status === 'approved' ? 'bg-green/10 text-green' : 'bg-amber-100 text-amber-600'
+                                                        }`}>
+                                                        {p.status === 'approved' ? 'Ativo' : 'Pendente'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-1 text-amber-500">
+                                                        <Star className="w-3 h-3 fill-current" />
+                                                        <span className="text-sm font-bold">{p.rating || '5.0'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm font-bold text-navy">
+                                                    R$ {p.wallet_balance?.toLocaleString() || '0,00'}
                                                 </td>
                                             </tr>
                                         ))}
@@ -222,37 +324,74 @@ export default function AdminDashboard() {
                                 </table>
                             </div>
                         </div>
+                    )}
 
-                        {/* Recent Bookings */}
+                    {activeTab === 'clients' && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center space-y-6">
+                            <div className="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto text-purple-600">
+                                <Users className="w-10 h-10" />
+                            </div>
+                            <h2 className="text-2xl font-black text-navy">Total de Clientes</h2>
+                            <p className="text-5xl font-black text-purple-600">{stats.totalClients}</p>
+                            <p className="text-gray-500 max-w-sm mx-auto">
+                                No momento, o sistema registra {stats.totalClients} clientes únicos na plataforma.
+                            </p>
+                            <div className="pt-8 border-t border-gray-50">
+                                <p className="text-xs text-gray-400 uppercase font-black tracking-widest">Dica do Sistema</p>
+                                <p className="text-sm text-gray-600">Para ver a cidade dos clientes, você pode solicitar a inclusão de um campo de endereço no perfil nas próximas atualizações.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'cities' && (
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                            <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                                <Clock className="w-5 h-5 text-green" />
-                                Últimos Serviços
-                            </h2>
-                            <div className="space-y-6">
-                                {recentBookings.length === 0 ? (
-                                    <p className="text-gray-400 text-center py-8">Nenhum agendamento recente</p>
-                                ) : recentBookings.map((b) => (
-                                    <div key={b.id} className="flex gap-4">
-                                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                            <BarChart3 className="w-5 h-5 text-gray-400" />
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-900">Distribuição Geográfica</h2>
+                                    <p className="text-sm text-gray-500">Cidades com prestadores ativos</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {cityData.map((c, i) => (
+                                    <div key={i} className="p-4 bg-gray-50 rounded-xl flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <MapPin className="w-4 h-4 text-green" />
+                                            <span className="font-bold text-navy">{c.city}</span>
                                         </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-bold text-gray-900 truncate">{b.service_name}</p>
-                                            <p className="text-xs text-gray-500">{b.client_name}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-xs font-bold text-green">R$ {b.total_amount?.toLocaleString()}</p>
-                                            <p className="text-[10px] text-gray-400">{new Date(b.created_at).toLocaleDateString()}</p>
-                                        </div>
+                                        <span className="bg-white px-2 py-1 rounded-md text-xs font-bold shadow-sm">{c.providers} profissionais</span>
                                     </div>
                                 ))}
                             </div>
-                            <button onClick={() => setActiveTab('marketing')} className="w-full mt-6 py-3 border border-gray-100 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
-                                Ver Relatório Completo
-                            </button>
                         </div>
-                    </div>
+                    )}
+                    {activeTab === 'marketing' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
+                                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
+                                    <TrendingUp className="w-8 h-8 text-blue-600" />
+                                </div>
+                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Lucro Plataforma</h3>
+                                <p className="text-3xl font-black text-blue-900">R$ {stats.financials.platformShare.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Referente a 5-6% de taxa</p>
+                            </div>
+                            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
+                                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
+                                    <CheckCircle2 className="w-8 h-8 text-green" />
+                                </div>
+                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pago aos Profissionais</h3>
+                                <p className="text-3xl font-black text-green-900">R$ {stats.financials.providerShare.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Referente a 94% dos serviços</p>
+                            </div>
+                            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
+                                <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto">
+                                    <Users className="w-8 h-8 text-purple-600" />
+                                </div>
+                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pagas por Indicação</h3>
+                                <p className="text-3xl font-black text-purple-900">R$ {stats.financials.referralShare.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Referente a 1% de cashback</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
         </div>
