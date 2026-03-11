@@ -333,7 +333,7 @@ export default function ProviderRegister() {
             // Passo A & B: Sincronização Atômica via RPC
             setRegistrationStatus('Salvando seus dados...')
             addLog('Sincronizando dados (Modo Atômico)...')
-            const { error: rpcError } = await supabase.rpc('register_provider_v3', {
+            const { error: rpcError } = await supabase.rpc('register_provider_v4', {
                 p_user_id: userId,
                 p_legal_name: form.legal_name,
                 p_trade_name: form.trade_name || form.legal_name,
