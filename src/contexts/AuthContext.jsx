@@ -71,14 +71,16 @@ export function AuthProvider({ children }) {
     }
 
     async function signUp(email, password, fullName, referralCode = null) {
+        const metadata = { full_name: fullName };
+        if (referralCode && referralCode.trim() !== '') {
+            metadata.referred_by_code = referralCode.trim();
+        }
+
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-                data: { 
-                    full_name: fullName,
-                    referred_by_code: referralCode 
-                },
+                data: metadata,
                 emailRedirectTo: window.location.origin
             }
         })
