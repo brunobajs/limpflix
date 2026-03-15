@@ -3,17 +3,24 @@
  * Nota: Esta API exige que a conta da LimpFlix tenha saldo e permissões de "Mass Payments".
  * 
  * Distribuição dos valores:
+ * Com indicação:
  * - 94% para o prestador do serviço
  * - 5% para a plataforma
- * - 1% para quem indicou (se houver)
+ * - 0.5% para quem indicou o cliente
+ * - 0.5% para quem indicou o prestador
+ * 
+ * Sem indicação:
+ * - 94% para o prestador do serviço
+ * - 6% para a plataforma
  */
 
 const MP_ACCESS_TOKEN = import.meta.env.VITE_MP_ACCESS_TOKEN;
 
 // Constantes para os percentuais de distribuição
-const PLATFORM_FEE = 0.05; // 5%
-const REFERRAL_FEE = 0.01; // 1%
 const PROVIDER_FEE = 0.94; // 94%
+const BASE_PLATFORM_FEE = 0.06; // 6% (sem indicação)
+const REFERRAL_PLATFORM_FEE = 0.05; // 5% (com indicação)
+const REFERRAL_FEE = 0.005; // 0.5% para cada indicador
 
 /**
  * Calcula a distribuição dos valores do pagamento
@@ -21,16 +28,24 @@ const PROVIDER_FEE = 0.94; // 94%
  * @param {boolean} hasReferral - Se existe indicador
  * @returns {Object} Valores calculados para cada parte
  */
-export function calculateSplitAmounts(totalAmount) {
-    const platformAmount = Math.floor(totalAmount * PLATFORM_FEE);
-    const referralAmount = Math.floor(totalAmount * REFERRAL_FEE);
+export function calculateSplitAmounts(totalAmount, { hasClientReferral = false, hasProviderReferral = false } = {}) {
     const providerAmount = Math.floor(totalAmount * PROVIDER_FEE);
+    
+    // Define a taxa da plataforma baseado na existência de indicações
+    const hasAnyReferral = hasClientReferral || hasProviderReferral;
+    const platformFee = hasAnyReferral ? REFERRAL_PLATFORM_FEE : BASE_PLATFORM_FEE;
+    const platformAmount = Math.floor(totalAmount * platformFee);
+
+    // Calcula comissões de indicação se houver
+    const clientReferralAmount = hasClientReferral ? Math.floor(totalAmount * REFERRAL_FEE) : 0;
+    const providerReferralAmount = hasProviderReferral ? Math.floor(totalAmount * REFERRAL_FEE) : 0;
 
     return {
         platformAmount,
-        referralAmount,
         providerAmount,
-        total: platformAmount + referralAmount + providerAmount
+        clientReferralAmount,
+        providerReferralAmount,
+        total: platformAmount + providerAmount + clientReferralAmount + providerReferralAmount
     };
 }
 
@@ -79,14 +94,20 @@ export async function sendPayoutPix({ pixKey, amount, description, isReferralPay
  */
 export async function processSplitPayment({ 
     totalAmount, 
-    providerPixKey, 
-    referrerPixKey = null, 
+    providerPixKey,
+    clientReferrerPixKey = null,
+    providerReferrerPixKey = null,
     description 
 }) {
-    const amounts = calculateSplitAmounts(totalAmount);
+    const amounts = calculateSplitAmounts(totalAmount, {
+        hasClientReferral: !!clientReferrerPixKey,
+        hasProviderReferral: !!providerReferrerPixKey
+    });
+
     const results = {
         provider: null,
-        referrer: null,
+        clientReferral: null,
+        providerReferral: null,
         platformFee: amounts.platformAmount
     };
 
@@ -98,12 +119,22 @@ export async function processSplitPayment({
             description: `Pagamento ${description} (94%)`
         });
 
-        // 2. Pagamento da comissão de indicação (1%, se houver)
-        if (referrerPixKey) {
-            results.referrer = await sendPayoutPix({
-                pixKey: referrerPixKey,
-                amount: amounts.referralAmount,
-                description: `Comissão de Indicação - ${description} (1%)`,
+        // 2. Pagamento da comissão de indicação do cliente (0.5%, se houver)
+        if (clientReferrerPixKey && amounts.clientReferralAmount > 0) {
+            results.clientReferral = await sendPayoutPix({
+                pixKey: clientReferrerPixKey,
+                amount: amounts.clientReferralAmount,
+                description: `Comissão Indicação Cliente - ${description} (0.5%)`,
+                isReferralPayout: true
+            });
+        }
+
+        // 3. Pagamento da comissão de indicação do prestador (0.5%, se houver)
+        if (providerReferrerPixKey && amounts.providerReferralAmount > 0) {
+            results.providerReferral = await sendPayoutPix({
+                pixKey: providerReferrerPixKey,
+                amount: amounts.providerReferralAmount,
+                description: `Comissão Indicação Prestador - ${description} (0.5%)`,
                 isReferralPayout: true
             });
         }
