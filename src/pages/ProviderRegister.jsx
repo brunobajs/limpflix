@@ -277,8 +277,7 @@ export default function ProviderRegister() {
                     email: form.email,
                     password: form.password,
                     options: { 
-                        data: { full_name: form.responsible_name },
-                        emailRedirectTo: window.location.origin
+                        data: { full_name: form.responsible_name }
                     }
                 })
                 if (signUpError) {

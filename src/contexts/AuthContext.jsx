@@ -80,11 +80,21 @@ export function AuthProvider({ children }) {
             email,
             password,
             options: {
-                data: metadata,
-                emailRedirectTo: window.location.origin
+                data: metadata
             }
         })
+        
         if (error) throw error
+
+        // Login automático após registro
+        if (data?.user) {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            })
+            if (signInError) throw signInError
+        }
+
         return data
     }
 
