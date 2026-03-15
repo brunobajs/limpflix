@@ -3,7 +3,12 @@
  * Nota: Esta API exige que a conta da LimpFlix tenha saldo e permissões de "Mass Payments".
  * 
  * Distribuição dos valores:
- * Com indicação:
+ * Com uma indicação:
+ * - 94% para o prestador do serviço
+ * - 5% para a plataforma
+ * - 1% para o indicador
+ * 
+ * Com duas indicações (cliente e prestador):
  * - 94% para o prestador do serviço
  * - 5% para a plataforma
  * - 0.5% para quem indicou o cliente
@@ -20,7 +25,8 @@ const MP_ACCESS_TOKEN = import.meta.env.VITE_MP_ACCESS_TOKEN;
 const PROVIDER_FEE = 0.94; // 94%
 const BASE_PLATFORM_FEE = 0.06; // 6% (sem indicação)
 const REFERRAL_PLATFORM_FEE = 0.05; // 5% (com indicação)
-const REFERRAL_FEE = 0.005; // 0.5% para cada indicador
+const SINGLE_REFERRAL_FEE = 0.01; // 1% para indicação única
+const SPLIT_REFERRAL_FEE = 0.005; // 0.5% quando há duas indicações
 
 /**
  * Calcula a distribuição dos valores do pagamento
@@ -36,9 +42,14 @@ export function calculateSplitAmounts(totalAmount, { hasClientReferral = false, 
     const platformFee = hasAnyReferral ? REFERRAL_PLATFORM_FEE : BASE_PLATFORM_FEE;
     const platformAmount = Math.floor(totalAmount * platformFee);
 
-    // Calcula comissões de indicação se houver
-    const clientReferralAmount = hasClientReferral ? Math.floor(totalAmount * REFERRAL_FEE) : 0;
-    const providerReferralAmount = hasProviderReferral ? Math.floor(totalAmount * REFERRAL_FEE) : 0;
+    // Calcula comissões de indicação
+    const hasBothReferrals = hasClientReferral && hasProviderReferral;
+    const referralFee = hasBothReferrals ? SPLIT_REFERRAL_FEE : SINGLE_REFERRAL_FEE;
+
+    // Se tem ambas indicações, divide 0.5% para cada
+    // Se tem apenas uma, paga 1% para quem indicou
+    const clientReferralAmount = hasClientReferral ? Math.floor(totalAmount * referralFee) : 0;
+    const providerReferralAmount = hasProviderReferral && hasBothReferrals ? Math.floor(totalAmount * referralFee) : 0;
 
     return {
         platformAmount,
