@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Loader2, Users } from 'lucide-react'
 

@@ -2,10 +2,9 @@ import { loadMercadoPago } from "@mercadopago/sdk-js"
 import { supabase } from './supabase'
 
 export const MP_PUBLIC_KEY = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY
-export const MP_ACCESS_TOKEN = import.meta.env.VITE_MP_ACCESS_TOKEN
 
 if (!MP_PUBLIC_KEY) {
-    throw new Error('⚠️ Chave pública do Mercado Pago não configurada no .env')
+    console.warn('⚠️ Chave pública do Mercado Pago não configurada no .env')
 }
 
 export async function initMercadoPago() {
@@ -19,62 +18,26 @@ export async function initMercadoPago() {
     }
 }
 
+/**
+ * Cria uma preferência de pagamento via Edge Function (server-side).
+ * O Access Token do Mercado Pago é gerenciado de forma segura no servidor.
+ */
 export async function createPaymentPreference({ clientEmail, serviceName, amount, metadata }) {
     try {
-        // 1. Tenta via Edge Function (produção)
         const { data, error } = await supabase.functions.invoke('create-payment', {
             body: { clientEmail, serviceName, amount, metadata }
         })
 
-        if (!error && data?.init_point) {
-            return data
+        if (error) {
+            console.error('Edge Function error:', error)
+            throw new Error(error.message || 'Erro ao criar preferência de pagamento')
         }
 
-        // 2. Fallback: chamada direta (desenvolvimento)
-        if (!MP_ACCESS_TOKEN) {
-            throw new Error('Configure VITE_MP_ACCESS_TOKEN no .env ou deploy a Edge Function create-payment')
+        if (!data?.init_point) {
+            throw new Error('Resposta inválida do servidor de pagamento')
         }
 
-        const queryParams = metadata ? new URLSearchParams(metadata).toString() : ''
-        const origin = window.location.origin
-
-        const preference = {
-            items: [{ 
-                title: serviceName, 
-                quantity: 1, 
-                unit_price: Number(amount), 
-                currency_id: 'BRL' 
-            }],
-            payer: { email: clientEmail },
-            external_reference: metadata?.quote_id || '',
-            back_urls: {
-                success: `${origin}/pagamento/sucesso?${queryParams}`,
-                failure: `${origin}/pagamento/erro`,
-                pending: `${origin}/pagamento/pendente`,
-            },
-            auto_return: 'approved',
-            payment_methods: {
-                excluded_payment_types: [{ id: 'ticket' }],
-                installments: 12,
-            },
-            statement_descriptor: 'LimpFlix Serviços',
-        }
-
-        const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(preference),
-        })
-
-        if (!response.ok) {
-            const errData = await response.json()
-            throw new Error(errData.message || 'Erro ao criar preferência de pagamento')
-        }
-
-        return response.json()
+        return data
     } catch (err) {
         console.error('Erro ao criar preferência:', err)
         throw err

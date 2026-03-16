@@ -1,6 +1,7 @@
 /**
  * Utilitário para realizar Payouts (Saques) via Mercado Pago.
- * Nota: Esta API exige que a conta da LimpFlix tenha saldo e permissões de "Mass Payments".
+ * Todos os pagamentos são processados via Edge Function (server-side)
+ * para garantir a segurança do Access Token.
  * 
  * Distribuição dos valores:
  * Com uma indicação:
@@ -19,7 +20,7 @@
  * - 6% para a plataforma
  */
 
-const MP_ACCESS_TOKEN = import.meta.env.VITE_MP_ACCESS_TOKEN;
+import { supabase } from './supabase'
 
 // Constantes para os percentuais de distribuição
 const PROVIDER_FEE = 0.94; // 94%
@@ -31,7 +32,7 @@ const SPLIT_REFERRAL_FEE = 0.005; // 0.5% quando há duas indicações
 /**
  * Calcula a distribuição dos valores do pagamento
  * @param {number} totalAmount - Valor total do pagamento
- * @param {boolean} hasReferral - Se existe indicador
+ * @param {Object} options - Opções de indicação
  * @returns {Object} Valores calculados para cada parte
  */
 export function calculateSplitAmounts(totalAmount, { hasClientReferral = false, hasProviderReferral = false } = {}) {
@@ -46,8 +47,6 @@ export function calculateSplitAmounts(totalAmount, { hasClientReferral = false, 
     const hasBothReferrals = hasClientReferral && hasProviderReferral;
     const referralFee = hasBothReferrals ? SPLIT_REFERRAL_FEE : SINGLE_REFERRAL_FEE;
 
-    // Se tem ambas indicações, divide 0.5% para cada
-    // Se tem apenas uma, paga 1% para quem indicou
     const clientReferralAmount = hasClientReferral ? Math.floor(totalAmount * referralFee) : 0;
     const providerReferralAmount = hasProviderReferral && hasBothReferrals ? Math.floor(totalAmount * referralFee) : 0;
 
@@ -61,43 +60,26 @@ export function calculateSplitAmounts(totalAmount, { hasClientReferral = false, 
 }
 
 /**
- * Realiza o pagamento PIX para o prestador
+ * Realiza o pagamento PIX via Edge Function (seguro, server-side).
  */
 export async function sendPayoutPix({ pixKey, amount, description, isReferralPayout = false }) {
-    const payoutData = {
-        amount: amount,
-        description: description || (isReferralPayout ? 'Comissão de Indicação LimpFlix' : 'Repasse LimpFlix'),
-        payment_method_id: 'pix',
-        payer: {
-            bank_transfer: {
-                pix: {
-                    receiver_key: pixKey
-                }
-            }
+    const idempotencyKey = `payout-${Date.now()}-${isReferralPayout ? 'ref' : 'prov'}-${Math.random().toString(36).slice(2)}`
+
+    const { data, error } = await supabase.functions.invoke('process-payout', {
+        body: {
+            pixKey,
+            amount,
+            description: description || (isReferralPayout ? 'Comissão de Indicação LimpFlix' : 'Repasse LimpFlix'),
+            idempotencyKey
         }
-    };
+    })
 
-    try {
-        const response = await fetch('https://api.mercadopago.com/v1/payouts', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
-                'Content-Type': 'application/json',
-                'X-Idempotency-Key': `payout-${Date.now()}-${isReferralPayout ? 'ref' : 'prov'}`
-            },
-            body: JSON.stringify(payoutData)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Erro ao processar transferência Pix');
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error('Payout Error:', error);
-        throw error;
+    if (error) {
+        console.error('Payout Edge Function error:', error)
+        throw new Error(error.message || 'Erro ao processar transferência Pix')
     }
+
+    return data
 }
 
 /**
