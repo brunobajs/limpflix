@@ -15,7 +15,8 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function testSignup() {
   console.log('Testing signup...')
-  const uniqueEmail = `test-client-${Date.now()}@example.com`
+  // ATENÇÃO: Use um email real ou desative "Confirm Email" no Supabase para evitar "bounces"
+  const uniqueEmail = `test-client-${Date.now()}@gmail.com`
   const { data, error } = await supabase.auth.signUp({
     email: uniqueEmail,
     password: 'Password123!',
