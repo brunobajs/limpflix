@@ -38,13 +38,7 @@ export const supabase = supabaseClient
 
 // Exporta também para o window para facilitar debug e prover fallback se necessário
 if (typeof window !== 'undefined') {
-    if (!window.supabase) {
-        Object.defineProperty(window, 'supabase', {
-            value: supabaseClient,
-            writable: false,
-            configurable: false
-        });
-    }
+    window.supabase = supabaseClient
 }
 
 // Helper para verificar conexão

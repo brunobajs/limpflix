@@ -4,8 +4,8 @@ import './index.css'
 import App from './App.jsx'
 import { supabase } from './lib/supabase'
 
-// Force global definition
-window.supabase = supabase
+// Force global definition (done in lib/supabase.js)
+// window.supabase = supabase
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
