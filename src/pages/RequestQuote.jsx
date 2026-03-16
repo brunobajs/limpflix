@@ -166,7 +166,7 @@ export default function RequestQuote() {
                 await supabase.from('chat_messages').insert({
                     conversation_id: chat.id,
                     sender_id: user.id,
-                    message: `Olá! Solicitei um orçamento para "${serviceName}".\n\nDescrição: ${description}\n\nLocalização: ${address}`
+                    content: `Olá! Solicitei um orçamento para "${serviceName}".\n\nDescrição: ${description}\n\nLocalização: ${address}`
                 })
             }
 

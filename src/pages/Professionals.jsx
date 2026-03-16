@@ -79,10 +79,7 @@ export default function Professionals() {
             setProviders(data || [])
         } catch (err) {
             console.error('Error loading providers:', err)
-            // Use demo data if Supabase is not configured
-            if (!profile?.referred_by_provider_id) {
-                setProviders(getDemoProviders())
-            }
+            setProviders([])
         } finally {
             setLoading(false)
         }
@@ -418,93 +415,4 @@ function ProviderCard({ provider }) {
     )
 }
 
-// Demo data for when Supabase is not configured yet
-function getDemoProviders() {
-    return [
-        {
-            id: 'demo-1',
-            trade_name: 'LimpezaPro São Paulo',
-            responsible_name: 'João Silva',
-            city: 'São Paulo',
-            state: 'SP',
-            rating: 4.9,
-            total_reviews: 127,
-            total_services: 350,
-            services_offered: ['Limpeza de Sofá', 'Limpeza de Colchão', 'Impermeabilização'],
-            latitude: -23.5505,
-            longitude: -46.6333,
-            bio: 'Profissional com mais de 10 anos de experiência em limpeza profissional.',
-        },
-        {
-            id: 'demo-2',
-            trade_name: 'CleanMax',
-            responsible_name: 'Maria Santos',
-            city: 'Rio de Janeiro',
-            state: 'RJ',
-            rating: 4.8,
-            total_reviews: 89,
-            total_services: 220,
-            services_offered: ['Limpeza de Carpete', 'Limpeza de Pisos', 'Limpeza Pós-Obra'],
-            latitude: -22.9068,
-            longitude: -43.1729,
-            bio: 'Equipe profissional atendendo toda a região metropolitana do Rio de Janeiro.',
-        },
-        {
-            id: 'demo-3',
-            trade_name: 'BH Clean',
-            responsible_name: 'Carlos Oliveira',
-            city: 'Belo Horizonte',
-            state: 'MG',
-            rating: 4.7,
-            total_reviews: 65,
-            total_services: 180,
-            total_services: 180,
-            services_offered: ['Limpeza de Vidros', 'Limpeza de Fachada', 'Faxina Residencial'],
-            latitude: -19.9167,
-            longitude: -43.9345,
-            bio: 'Especialistas em limpeza de vidros e fachadas comerciais.',
-        },
-        {
-            id: 'demo-4',
-            trade_name: 'SuperLimp Curitiba',
-            responsible_name: 'Ana Paula',
-            city: 'Curitiba',
-            state: 'PR',
-            rating: 5.0,
-            total_reviews: 43,
-            total_services: 95,
-            services_offered: ['Limpeza de Sofá', 'Limpeza de Cortinas', "Limpeza de Caixa d'Água"],
-            latitude: -25.4284,
-            longitude: -49.2733,
-            bio: 'Atendimento diferenciado com produtos ecológicos.',
-        },
-        {
-            id: 'demo-5',
-            trade_name: 'Higitech',
-            responsible_name: 'Roberto Lima',
-            city: 'Campinas',
-            state: 'SP',
-            rating: 4.6,
-            total_reviews: 112,
-            total_services: 400,
-            services_offered: ['Impermeabilização', 'Limpeza de Colchão', 'Limpeza de Sofá', 'Limpeza de Carpete'],
-            latitude: -22.9056,
-            longitude: -47.0608,
-            bio: 'Mais de 400 serviços realizados com excelência.',
-        },
-        {
-            id: 'demo-6',
-            trade_name: 'AquaClean Brasília',
-            responsible_name: 'Fernanda Costa',
-            city: 'Brasília',
-            state: 'DF',
-            rating: 4.9,
-            total_reviews: 78,
-            total_services: 200,
-            services_offered: ["Limpeza de Caixa d'Água", 'Limpeza de Pisos', 'Limpeza Pós-Obra'],
-            latitude: -15.7975,
-            longitude: -47.8919,
-            bio: 'Especialistas em limpeza de caixa d\'água e pisos.',
-        },
-    ]
-}
+

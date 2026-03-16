@@ -19,12 +19,8 @@ export default function ProviderProfile() {
     async function loadProvider() {
         setLoading(true)
         try {
-            // Check if demo
-            if (id?.startsWith('demo-')) {
-                setProvider(getDemoProvider(id))
-                setLoading(false)
-                return
-            }
+            // Removed demo check to ensure only real database entries are shown
+
             const { data, error } = await supabase
                 .from('service_providers')
                 .select('*')
@@ -260,56 +256,4 @@ export default function ProviderProfile() {
     )
 }
 
-function getDemoProvider(id) {
-    const demos = {
-        'demo-1': {
-            id: 'demo-1', trade_name: 'LimpezaPro São Paulo', responsible_name: 'João Silva',
-            city: 'São Paulo', state: 'SP', rating: 4.9, total_reviews: 127, total_services: 350,
-            services_offered: ['Limpeza de Sofá', 'Limpeza de Colchão', 'Impermeabilização'],
-            bio: 'Profissional com mais de 10 anos de experiência em limpeza profissional. Atendemos toda a Grande São Paulo com equipamentos modernos e produtos de primeira linha.',
-            phone: '(11) 99999-1111', email: 'contato@limpezapro.com',
-            created_at: '2024-01-15',
-        },
-        'demo-2': {
-            id: 'demo-2', trade_name: 'CleanMax', responsible_name: 'Maria Santos',
-            city: 'Rio de Janeiro', state: 'RJ', rating: 4.8, total_reviews: 89, total_services: 220,
-            services_offered: ['Limpeza de Carpete', 'Limpeza de Pisos', 'Limpeza Pós-Obra'],
-            bio: 'Equipe profissional atendendo toda a região metropolitana do Rio de Janeiro.',
-            phone: '(21) 99999-2222', email: 'contato@cleanmax.com',
-            created_at: '2024-03-20',
-        },
-        'demo-3': {
-            id: 'demo-3', trade_name: 'BH Clean', responsible_name: 'Carlos Oliveira',
-            city: 'Belo Horizonte', state: 'MG', rating: 4.7, total_reviews: 65, total_services: 180,
-            services_offered: ['Limpeza de Vidros', 'Limpeza de Fachada', 'Limpeza Comercial'],
-            bio: 'Especialistas em limpeza de vidros e fachadas comerciais.',
-            phone: '(31) 99999-3333', email: 'contato@bhclean.com',
-            created_at: '2024-05-10',
-        },
-        'demo-4': {
-            id: 'demo-4', trade_name: 'SuperLimp Curitiba', responsible_name: 'Ana Paula',
-            city: 'Curitiba', state: 'PR', rating: 5.0, total_reviews: 43, total_services: 95,
-            services_offered: ['Limpeza de Sofá', 'Limpeza de Cortinas', "Limpeza de Caixa d'Água"],
-            bio: 'Atendimento diferenciado com produtos ecológicos.',
-            phone: '(41) 99999-4444', email: 'contato@superlimp.com',
-            created_at: '2024-06-01',
-        },
-        'demo-5': {
-            id: 'demo-5', trade_name: 'Higitech', responsible_name: 'Roberto Lima',
-            city: 'Campinas', state: 'SP', rating: 4.6, total_reviews: 112, total_services: 400,
-            services_offered: ['Higienização', 'Limpeza de Colchão', 'Limpeza de Sofá', 'Limpeza de Carpete'],
-            bio: 'Mais de 400 serviços realizados com excelência.',
-            phone: '(19) 99999-5555', email: 'contato@higitech.com',
-            created_at: '2024-02-28',
-        },
-        'demo-6': {
-            id: 'demo-6', trade_name: 'AquaClean Brasília', responsible_name: 'Fernanda Costa',
-            city: 'Brasília', state: 'DF', rating: 4.9, total_reviews: 78, total_services: 200,
-            services_offered: ["Limpeza de Caixa d'Água", 'Limpeza de Pisos', 'Limpeza Pós-Obra'],
-            bio: 'Especialistas em limpeza de caixa d\'água e pisos.',
-            phone: '(61) 99999-6666', email: 'contato@aquaclean.com',
-            created_at: '2024-04-15',
-        },
-    }
-    return demos[id] || null
-}
+
