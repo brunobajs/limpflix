@@ -18,6 +18,11 @@ export default function Login() {
     const { signIn, signUp } = useAuth()
     const navigate = useNavigate()
 
+    useEffect(() => {
+        console.log('[DEBUG] Login component mounted. Supabase imported:', !!supabase)
+        console.log('[DEBUG] window.supabase check:', !!window.supabase)
+    }, [])
+
     async function handleSubmit(e) {
         e.preventDefault()
         setError('')

@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
+        console.log('[DEBUG] AuthProvider mounted. Supabase instance:', !!supabase)
         // Get initial session
         const getInitialSession = async () => {
             try {

@@ -95,6 +95,8 @@ export default function Professionals() {
 
             const { data, error } = await query.order('rating', { ascending: false })
 
+            console.log('[DEBUG] loadProviders results:', { count: data?.length, error, profile: !!profile })
+
             if (error) throw error
             setProviders(data || [])
         } catch (err) {
@@ -106,6 +108,11 @@ export default function Professionals() {
     }
 
     async function handleGeoLocation() {
+        if (!profile) {
+            alert('Para buscar profissionais perto de você, por favor faça login ou crie uma conta.')
+            navigate('/login')
+            return
+        }
         setGeoLoading(true)
         try {
             const pos = await getCurrentPosition()
