@@ -16,6 +16,7 @@ import PaymentSuccess from './pages/PaymentSuccess'
 import AdminDashboard from './pages/AdminDashboard'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
+import InstallPrompt from './components/InstallPrompt'
 import { useEffect } from 'react'
 
 // ScrollToTop component
@@ -75,6 +76,7 @@ function App() {
                         </Layout>
                     } />
                 </Routes>
+                <InstallPrompt />
             </Router>
         </AuthProvider>
     )
