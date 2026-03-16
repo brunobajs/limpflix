@@ -43,9 +43,6 @@ function App() {
     return (
         <AuthProvider>
             <Router>
-                <div className="fixed top-0 left-0 right-0 bg-yellow-400 text-black text-[10px] py-0.5 text-center font-bold z-[9999] opacity-50 pointer-events-none">
-                    LIMPFLIX DEBUG MODE - V1.1 - SUPABASE CHECK ACTIVE
-                </div>
                 <ScrollToTop />
                 <Routes>
                     {/* Pages with Header/Footer */}
