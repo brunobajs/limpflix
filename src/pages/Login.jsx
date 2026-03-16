@@ -23,6 +23,7 @@ export default function Login() {
         setError('')
         setSuccess('')
         setLoading(true)
+        console.log('[DEBUG] Login submit. Supabase instance available:', !!supabase)
         try {
             if (isLogin) {
                 const { user: signedUser } = await signIn(email, password)

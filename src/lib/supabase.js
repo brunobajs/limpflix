@@ -36,6 +36,11 @@ const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
 // Singleton pattern para garantir uma única instância
 export const supabase = supabaseClient
 
+// Exporta também para o window para facilitar debug e prover fallback se necessário
+if (typeof window !== 'undefined') {
+    window.supabase = supabaseClient
+}
+
 // Helper para verificar conexão
 export async function checkSupabaseConnection() {
     try {

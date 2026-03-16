@@ -26,6 +26,21 @@ const SERVICE_OPTIONS = [
     'Impermeabilização', 'Faxina Residencial'
 ]
 
+// Mapeamento de slugs da URL para nomes reais do banco
+const SLUG_TO_SERVICE = {
+    'limpeza-sofa': 'Limpeza de Sofá',
+    'limpeza-colchao': 'Limpeza de Colchão',
+    'limpeza-carpete': 'Limpeza de Carpete',
+    'limpeza-cortinas': 'Limpeza de Cortinas',
+    'limpeza-pisos': 'Limpeza de Pisos',
+    'limpeza-caixa-dagua': "Limpeza de Caixa d'Água",
+    'limpeza-vidros': 'Limpeza de Vidros',
+    'limpeza-fachada': 'Limpeza de Fachada',
+    'limpeza-pos-obra': 'Limpeza Pós-Obra',
+    'impermeabilizacao': 'Impermeabilização',
+    'faxina-residencial': 'Faxina Residencial'
+}
+
 export default function Professionals() {
     const [searchParams] = useSearchParams()
     const { profile } = useAuth()
@@ -33,7 +48,12 @@ export default function Professionals() {
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [cityFilter, setCityFilter] = useState('')
-    const [serviceFilter, setServiceFilter] = useState(searchParams.get('servico') || '')
+    
+    // Converte o slug da URL para o nome real, ou mantém o original se não houver no mapa
+    const urlService = searchParams.get('servico')
+    const initialService = SLUG_TO_SERVICE[urlService] || urlService || ''
+    
+    const [serviceFilter, setServiceFilter] = useState(initialService)
     const [sortBy, setSortBy] = useState('rating')
     const [userLocation, setUserLocation] = useState(null)
     const [geoLoading, setGeoLoading] = useState(false)
@@ -98,23 +118,30 @@ export default function Professionals() {
         }
     }
 
+    // Helper para normalizar texto (remover acentos)
+    const normalize = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+
     // Filter and sort
     let filtered = providers.filter(p => {
-        const pCity = p.city || ''
-        const pTrade = p.trade_name || ''
-        const pResp = p.responsible_name || ''
-        const pServices = p.services_offered || []
+        const pCity = normalize(p.city || '')
+        const pTrade = normalize(p.trade_name || '')
+        const pResp = normalize(p.responsible_name || '')
+        const pServices = (p.services_offered || []).map(s => normalize(s))
 
-        const matchSearch = !search ||
-            pTrade.toLowerCase().includes(search.toLowerCase()) ||
-            pResp.toLowerCase().includes(search.toLowerCase())
+        const searchNorm = normalize(search)
+        const cityNorm = normalize(cityFilter)
+        const serviceNorm = normalize(serviceFilter)
 
-        const matchCity = !cityFilter ||
-            pCity.toLowerCase() === cityFilter.toLowerCase() ||
-            pCity.toLowerCase().includes(cityFilter.toLowerCase())
+        const matchSearch = !searchNorm ||
+            pTrade.includes(searchNorm) ||
+            pResp.includes(searchNorm)
 
-        const matchService = !serviceFilter ||
-            pServices.some(s => s.toLowerCase().includes(serviceFilter.toLowerCase()))
+        const matchCity = !cityNorm ||
+            pCity === cityNorm ||
+            pCity.includes(cityNorm)
+
+        const matchService = !serviceNorm ||
+            pServices.some(s => s.includes(serviceNorm))
 
         const matchAvailable = !onlyAvailable || !p.is_busy
 
