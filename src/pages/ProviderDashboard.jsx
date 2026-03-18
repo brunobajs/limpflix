@@ -8,7 +8,7 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield
+    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield, BookOpen, FileText
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
 import ChatWindow from '../components/ChatWindow'
@@ -87,6 +87,8 @@ export default function ProviderDashboard() {
     const [transactions, setTransactions] = useState([])
     const [loadingTransactions, setLoadingTransactions] = useState(false)
     const [isWithdrawing, setIsWithdrawing] = useState(false)
+    const [academyContents, setAcademyContents] = useState([])
+    const [loadingAcademy, setLoadingAcademy] = useState(false)
 
     // 1. Initial Data Loading (only when user changes)
     useEffect(() => {
@@ -96,6 +98,7 @@ export default function ProviderDashboard() {
             try {
                 await refreshProfile()
                 await loadProviderData()
+                await fetchAcademyContents()
             } catch (err) {
                 console.error("Erro no carregamento inicial:", err)
             }
@@ -286,6 +289,20 @@ export default function ProviderDashboard() {
             console.error('Error fetching transactions:', err)
         } finally {
             setLoadingTransactions(false)
+        }
+    async function fetchAcademyContents() {
+        setLoadingAcademy(true)
+        try {
+            const { data } = await supabase
+                .from('academy_contents')
+                .select('*')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+            setAcademyContents(data || [])
+        } catch (err) {
+            console.error('Error fetching academy contents:', err)
+        } finally {
+            setLoadingAcademy(false)
         }
     }
 
@@ -508,6 +525,7 @@ export default function ProviderDashboard() {
         { id: 'reviews', label: 'Avaliações', icon: Star },
         { id: 'referrals', label: 'Indicações', icon: Users },
         { id: 'messages', label: 'Mensagens', icon: MessageSquare },
+        { id: 'academy', label: 'Academia LimpFlix', icon: GraduationCap },
         { id: 'settings', label: 'Configurações', icon: Settings },
         { id: 'verification', label: 'Verificações', icon: Shield },
     ]
@@ -781,7 +799,7 @@ export default function ProviderDashboard() {
                             </button>
 
                             <button
-                                onClick={futureFeatureAlert}
+                                onClick={() => setActiveTab('academy')}
                                 className="flex items-center justify-between p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
                             >
                                 <div className="flex items-center gap-4">
@@ -789,8 +807,8 @@ export default function ProviderDashboard() {
                                         <GraduationCap className="w-6 h-6 text-blue-600" />
                                     </div>
                                     <div className="text-left">
-                                        <h3 className="font-bold text-gray-900 leading-tight">Cursos e Treinamentos</h3>
-                                        <p className="text-xs text-gray-400">Capacite-se para ganhar mais</p>
+                                        <h3 className="font-bold text-gray-900 leading-tight">Academia LimpFlix</h3>
+                                        <p className="text-xs text-gray-400">Capacite-se e baixe e-books exclusivos</p>
                                     </div>
                                 </div>
                                 <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
@@ -1000,6 +1018,72 @@ export default function ProviderDashboard() {
                         </div>
                     </div>
                 )}
+
+                {/* Academy Tab */}
+                {activeTab === 'academy' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-8 text-white relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-10">
+                                <GraduationCap className="w-32 h-32" />
+                            </div>
+                            <div className="relative z-10">
+                                <h2 className="text-2xl font-bold mb-2">Bem-vindo à Academia LimpFlix! 🎓</h2>
+                                <p className="text-white/70 text-sm max-w-md">
+                                    Aqui você encontra materiais exclusivos para aprimorar suas técnicas, aprender sobre gestão e vender mais seus serviços.
+                                </p>
+                            </div>
+                        </div>
+
+                        {loadingAcademy ? (
+                            <div className="flex justify-center py-12">
+                                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                            </div>
+                        ) : academyContents.length === 0 ? (
+                            <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
+                                <BookOpen className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-gray-700">Ainda não há conteúdos disponíveis</h3>
+                                <p className="text-gray-500">Fique atento! Em breve subiremos os primeiros e-books aqui.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {academyContents.map((content) => (
+                                    <div key={content.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col">
+                                        <div className="aspect-video bg-gray-100 relative overflow-hidden flex items-center justify-center">
+                                            {content.thumbnail_url ? (
+                                                <img src={content.thumbnail_url} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="text-center p-4">
+                                                    <BookOpen className="w-12 h-12 text-blue-100 mx-auto mb-2" />
+                                                    <span className="text-[10px] uppercase font-black text-blue-200 tracking-widest">{content.content_type}</span>
+                                                </div>
+                                            )}
+                                            <div className="absolute top-3 left-3">
+                                                <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase">
+                                                    {content.category || 'Geral'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="p-5 flex-1 flex flex-col">
+                                            <h3 className="font-bold text-gray-900 mb-2">{content.title}</h3>
+                                            <p className="text-sm text-gray-500 mb-4 line-clamp-2">{content.description}</p>
+                                            <div className="mt-auto">
+                                                <a 
+                                                    href={content.file_url} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="w-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <FileText className="w-4 h-4" />
+                                                    {content.content_type === 'ebook' ? 'Baixar E-book' : 'Acessar Conteúdo'}
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )  }
 
                 {/* Settings Tab */}
                 {activeTab === 'settings' && (
