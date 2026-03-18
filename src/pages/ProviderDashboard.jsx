@@ -65,6 +65,7 @@ export default function ProviderDashboard() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('overview')
     const [showWelcome, setShowWelcome] = useState(searchParams.get('welcome') === 'true')
+    const [dismissingWelcome, setDismissingWelcome] = useState(false)
     const [copied, setCopied] = useState(false)
     const [renderError, setRenderError] = useState(null)
 
@@ -1257,6 +1258,86 @@ export default function ProviderDashboard() {
                 )}
             </div>
         </div>
+            {/* Welcome & Safety Modal for Providers */}
+            {showWelcome && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy/90 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-scale-up">
+                        <div className="bg-gradient-to-br from-navy via-navy-light to-navy p-8 text-center relative">
+                            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/20">
+                                <Shield className="w-10 h-10 text-white animate-pulse" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo à Elite LimpFlix!</h2>
+                            <p className="text-white/80 text-sm">Sua jornada rumo ao topo do mercado de limpeza começa aqui.</p>
+                            
+                            <button 
+                                onClick={() => setShowWelcome(false)}
+                                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-8">
+                            <div className="space-y-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-amber-100">
+                                        <AlertCircle className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 text-sm">Regra Anti-Bypass (Crítica)</h4>
+                                        <p className="text-xs text-gray-600 leading-relaxed mt-1">
+                                            Toda negociação iniciada na LimpFlix **deve ser finalizada via nossa plataforma**. Tentar fechar serviços por fora acarretará na **exclusão imediata e permanente** do seu perfil.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 bg-green/5 rounded-xl flex items-center justify-center flex-shrink-0 border border-green/10">
+                                        <DollarSign className="w-5 h-5 text-green" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 text-sm">Garantia de Recebimento</h4>
+                                        <p className="text-xs text-gray-600 leading-relaxed mt-1">
+                                            Utilizar nosso sistema de pagamentos garante que você receba o valor combinado. Nós seguramos o pagamento e liberamos para você com total segurança.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-blue-100">
+                                        <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 text-sm">Profissionalismo</h4>
+                                        <p className="text-xs text-gray-600 leading-relaxed mt-1">
+                                            Prestadores que utilizam o checkout oficial têm ranking mais alto e passam mais confiança para os clientes.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setDismissingWelcome(true)
+                                    // Remove 'welcome' from URL
+                                    const newParams = new URLSearchParams(searchParams)
+                                    newParams.delete('welcome')
+                                    navigate({ search: newParams.toString() }, { replace: true })
+                                    setTimeout(() => setShowWelcome(false), 200)
+                                }}
+                                disabled={dismissingWelcome}
+                                className="w-full bg-navy hover:bg-navy-light text-white font-bold py-4 rounded-xl mt-8 transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
+                            >
+                                {dismissingWelcome ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Entendi e Aceito as Regras'}
+                            </button>
+                            
+                            <p className="text-[10px] text-gray-400 text-center mt-4">
+                                Ao clicar em aceitar, você confirma estar ciente dos termos de uso da plataforma.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </LocalErrorBoundary>
     )
 }

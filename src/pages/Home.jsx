@@ -160,18 +160,20 @@ export default function Home() {
                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <Link
                                     to="/profissionais"
-                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-green hover:bg-green-dark text-white px-8 py-3.5 rounded-xl text-lg font-semibold transition-all hover:scale-105 shadow-lg shadow-green/25"
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-green hover:bg-green-dark text-white px-10 py-4 rounded-2xl text-xl font-black transition-all hover:scale-105 shadow-xl shadow-green/40 group"
                                 >
-                                    <Search className="w-5 h-5" />
-                                    Buscar Profissionais
+                                    Limpar Agora
+                                    <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                                 </Link>
-                                <Link
-                                    to="/servicos"
-                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-8 py-3.5 rounded-xl text-lg font-semibold transition-all border border-white/20"
-                                >
-                                    <Search className="w-5 h-5" />
-                                    Buscar Serviços
-                                </Link>
+                                <div className="flex flex-col items-center sm:items-start">
+                                    <div className="flex items-center gap-2 text-white/60 text-sm mb-1">
+                                        <CheckCircle2 className="w-4 h-4 text-green" />
+                                        <span>Cadastro Gratuito</span>
+                                    </div>
+                                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                                        Rápido & Seguro
+                                    </div>
+                                </div>
                             </div>
                             {/* Stats */}
                             <div className="grid grid-cols-3 gap-6 mt-12 max-w-lg">

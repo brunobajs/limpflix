@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
-    Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight
+    Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, Shield, X
 } from 'lucide-react'
 
 import React from 'react'
@@ -30,12 +30,14 @@ class LocalErrorBoundary extends React.Component {
         return this.props.children
     }
 }
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 export default function ClientDashboard() {
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
     const { user, loading: authLoading } = useAuth()
     const [loading, setLoading] = useState(true)
+    const [showWelcome, setShowWelcome] = useState(searchParams.get('welcome') === 'true')
     const [chats, setChats] = useState([])
     const [selectedChat, setSelectedChat] = useState(null)
     const [activeBooking, setActiveBooking] = useState(null)
@@ -256,7 +258,7 @@ export default function ClientDashboard() {
             await supabase.from('chat_messages').insert({
                 conversation_id: selectedChat.id,
                 sender_id: user.id,
-                content: newMessage.trim()
+                message: newMessage.trim()
             })
             setNewMessage('')
             loadMessages(selectedChat.id)
@@ -461,7 +463,7 @@ export default function ClientDashboard() {
                                                 ? 'bg-green text-white rounded-tr-none'
                                                 : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
                                                 }`}>
-                                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                                                 <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
                                                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </div>
@@ -552,6 +554,54 @@ export default function ClientDashboard() {
                                 className="w-full text-gray-400 text-sm font-medium hover:text-gray-600"
                             >
                                 Pular agora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Welcome & Safety Modal */}
+            {showWelcome && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-slide-up">
+                        {/* Header Image/Icon */}
+                        <div className="bg-navy p-8 text-center relative">
+                            <button 
+                                onClick={() => setShowWelcome(false)}
+                                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                            <div className="w-20 h-20 bg-green/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-green/30">
+                                <Shield className="w-10 h-10 text-green" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white">Bem-vindo à LimpFlix! 🎉</h2>
+                            <p className="text-green font-medium">Sua segurança é nossa prioridade</p>
+                        </div>
+
+                        <div className="p-8">
+                            <div className="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
+                                <p>
+                                    Para sua proteção e garantia de serviço, realize todos os seus pagamentos **exclusivamente através da nossa plataforma**.
+                                </p>
+                                
+                                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">
+                                    <p className="text-blue-900 font-medium"> Por que pagar pelo LimpFlix?</p>
+                                    <p className="text-blue-800 text-xs mt-1">
+                                        Isso assegura que você receba o estorno integral caso o profissional não realize o trabalho conforme o combinado.
+                                    </p>
+                                </div>
+
+                                <p className="text-xs border-t border-gray-100 pt-4 text-gray-400">
+                                    <span className="font-bold text-red-500 uppercase">Atenção:</span> O alinhamento de pagamentos diretos com prestadores é estritamente proibido e resulta na perda de todas as garantias e na possível exclusão da conta. Em caso de negociações externas, a LimpFlix isenta-se de qualquer responsabilidade.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => setShowWelcome(false)}
+                                className="w-full mt-8 bg-green hover:bg-green-dark text-white py-4 rounded-2xl font-bold transition-all shadow-lg shadow-green/25 hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                Entendi e Aceito
                             </button>
                         </div>
                     </div>

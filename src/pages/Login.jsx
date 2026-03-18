@@ -53,7 +53,8 @@ export default function Login() {
                 }
                 await signUp(email, password, fullName, referralCode)
                 setSuccess('Conta criada com sucesso! Você já pode entrar.')
-                setIsLogin(true)
+                // Redireciona para o dashboard com a flag de boas-vindas
+                navigate('/cliente/dashboard?welcome=true')
             }
         } catch (err) {
             setError(err.message === 'Invalid login credentials'

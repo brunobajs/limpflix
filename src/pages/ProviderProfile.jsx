@@ -4,13 +4,18 @@ import { supabase } from '../lib/supabase'
 import {
     Star, MapPin, Phone, Mail, Calendar,
     ArrowLeft, User, Loader2, CheckCircle2,
-    Clock, MessageCircle
+    Clock, MessageCircle, Shield, X, ArrowRight
 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import UserOnboarding from '../components/UserOnboarding'
 
 export default function ProviderProfile() {
     const { id } = useParams()
     const [provider, setProvider] = useState(null)
     const [loading, setLoading] = useState(true)
+    const { isAuthenticated } = useAuth()
+    const [showGuestAlert, setShowGuestAlert] = useState(false)
+    const [showOnboarding, setShowOnboarding] = useState(false)
 
     useEffect(() => {
         loadProvider()
@@ -119,13 +124,23 @@ export default function ProviderProfile() {
                                 <MessageCircle className="w-5 h-5" />
                                 WhatsApp
                             </a>
-                            <Link
-                                to={`/solicitar-orcamento?profissional=${provider.id}`}
-                                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
-                            >
-                                <Calendar className="w-5 h-5" />
-                                Orçamento
-                            </Link>
+                            {isAuthenticated ? (
+                                <Link
+                                    to={`/solicitar-orcamento?profissional=${provider.id}`}
+                                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
+                                >
+                                    <Calendar className="w-5 h-5" />
+                                    Orçamento
+                                </Link>
+                            ) : (
+                                <button
+                                    onClick={() => setShowGuestAlert(true)}
+                                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
+                                >
+                                    <Calendar className="w-5 h-5" />
+                                    Orçamento
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -236,22 +251,68 @@ export default function ProviderProfile() {
                             </div>
                         </div>
 
-                        {/* CTA */}
-                        <div className="bg-gradient-to-br from-green to-emerald-600 rounded-2xl p-6 text-white">
-                            <h3 className="font-bold text-lg mb-2">Precisa deste serviço?</h3>
-                            <p className="text-white/80 text-sm mb-4">
-                                Solicite um orçamento diretamente com este profissional.
-                            </p>
-                            <Link
-                                to={`/solicitar-orcamento?profissional=${provider.id}`}
-                                className="block w-full bg-white text-green font-bold py-3 rounded-xl text-center hover:bg-gray-50 transition-colors"
+            {/* Guest Alert Modal */}
+            {showGuestAlert && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy/90 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-scale-up border border-white/20">
+                        <div className="bg-gradient-to-br from-navy via-navy-light to-navy p-8 text-center relative">
+                            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
+                                <Shield className="w-8 h-8 text-green" />
+                            </div>
+                            <h2 className="text-xl font-bold text-white mb-2">Solicitar Orçamento</h2>
+                            <p className="text-white/60 text-sm">Quase lá! Para sua segurança, precisamos de um cadastro rápido.</p>
+                            
+                            <button 
+                                onClick={() => setShowGuestAlert(false)}
+                                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
                             >
-                                Solicitar Orçamento
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-8">
+                            <div className="space-y-4 mb-6">
+                                <div className="flex items-center gap-3 text-gray-700">
+                                    <CheckCircle2 className="w-5 h-5 text-green" />
+                                    <span className="text-sm font-medium">Chat seguro e direto</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-gray-700">
+                                    <CheckCircle2 className="w-5 h-5 text-green" />
+                                    <span className="text-sm font-medium">Histórico de orçamentos</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-gray-700">
+                                    <CheckCircle2 className="w-5 h-5 text-green" />
+                                    <span className="text-sm font-medium">Proteção de dados</span>
+                                </div>
+                            </div>
+
+                            <Link
+                                to={`/login?redirect=/solicitar-orcamento?profissional=${provider.id}`}
+                                className="block w-full bg-green hover:bg-green-dark text-white font-bold py-4 rounded-xl text-center transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
+                            >
+                                Fazer Cadastro Rápido
+                                <ArrowRight className="w-5 h-5" />
                             </Link>
+                            
+                            <button
+                                onClick={() => {
+                                    setShowGuestAlert(false)
+                                    setShowOnboarding(true)
+                                }}
+                                className="w-full mt-3 text-gray-500 hover:text-navy text-sm font-medium transition-colors"
+                            >
+                                Como funciona a LimpFlix?
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
+
+            <UserOnboarding 
+                isOpen={showOnboarding}
+                onClose={() => setShowOnboarding(false)}
+                onStart={() => setShowGuestAlert(true)}
+            />
         </div >
     )
 }

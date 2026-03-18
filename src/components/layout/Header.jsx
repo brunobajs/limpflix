@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Menu, X, User, LogOut, LayoutDashboard, MessageSquare, Sparkles } from 'lucide-react'
+import { Menu, X, User, LogOut, LayoutDashboard, MessageSquare, Sparkles, Play } from 'lucide-react'
+import UserOnboarding from '../UserOnboarding'
 
 export default function Header() {
     const [mobileOpen, setMobileOpen] = useState(false)
     const { user, profile, signOut, isAuthenticated } = useAuth()
     const navigate = useNavigate()
     const [dropdownOpen, setDropdownOpen] = useState(false)
+    const [showOnboarding, setShowOnboarding] = useState(false)
 
     async function handleSignOut() {
         try {
@@ -104,60 +106,94 @@ export default function Header() {
                                 )}
                             </div>
                         ) : (
-                            <Link
-                                to="/login"
-                                className="text-white/80 hover:text-white transition-colors text-sm font-medium"
+                            <button
+                                onClick={() => setShowOnboarding(true)}
+                                className="relative overflow-hidden group bg-navy hover:bg-navy-light text-white px-6 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105 shadow-lg flex items-center gap-2 border border-white/10"
                             >
-                                Entrar
-                            </Link>
+                                <span className="absolute inset-0 bg-gradient-to-r from-green/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></span>
+                                <Play className="w-3 h-3 fill-current" />
+                                Iniciar
+                            </button>
                         )}
                     </nav>
 
                     {/* Mobile button */}
-                    <button
-                        onClick={() => setMobileOpen(!mobileOpen)}
-                        className="md:hidden text-white p-2"
-                    >
-                        {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                    </button>
+                    <div className="flex items-center gap-2 md:hidden">
+                        {!isAuthenticated && (
+                            <button
+                                onClick={() => setShowOnboarding(true)}
+                                className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg flex items-center gap-1.5"
+                            >
+                                <Play className="w-3 h-3 fill-current" />
+                                Iniciar
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setMobileOpen(!mobileOpen)}
+                            className="text-white p-2"
+                        >
+                            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Mobile menu */}
                 {mobileOpen && (
-                    <div className="md:hidden pb-4 space-y-2 animate-fade-in">
-                        <Link to="/" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm">
+                    <div className="md:hidden pb-4 space-y-2 animate-fade-in border-t border-white/5 mt-2 pt-4">
+                        <Link to="/" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm font-medium">
                             Início
                         </Link>
-                        <Link to="/servicos" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm">
+                        <Link to="/servicos" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm font-medium">
                             Serviços
                         </Link>
-                        <Link to="/profissionais" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm">
+                        <Link to="/profissionais" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm font-medium">
                             Profissionais
                         </Link>
                         <Link
                             to="/cadastro-profissional"
                             onClick={() => setMobileOpen(false)}
-                            className="block bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-sm font-semibold text-center"
+                            className="block bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-medium mb-2 border border-white/10"
                         >
                             Seja um Profissional
                         </Link>
                         {isAuthenticated ? (
                             <>
-                                <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm">
-                                    Dashboard
+                                <Link 
+                                    to="/dashboard" 
+                                    onClick={() => setMobileOpen(false)}
+                                    className="flex items-center gap-2 text-white bg-green/10 p-4 rounded-2xl border border-green/20"
+                                >
+                                    <div className="w-10 h-10 bg-green/20 rounded-full flex items-center justify-center">
+                                        <User className="w-5 h-5 text-green" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold">Meu Painel</span>
+                                        <span className="text-[10px] text-green underline">Ver Dashboard</span>
+                                    </div>
                                 </Link>
-                                <button onClick={() => { handleSignOut(); setMobileOpen(false) }} className="block text-red-400 hover:text-red-300 py-2 text-sm w-full text-left">
-                                    Sair
+                                <button onClick={() => { handleSignOut(); setMobileOpen(false) }} className="flex items-center gap-2 text-red-400 py-3 text-sm w-full text-left px-4">
+                                    <LogOut className="w-4 h-4" />
+                                    Sair da Conta
                                 </button>
                             </>
                         ) : (
-                            <Link to="/login" onClick={() => setMobileOpen(false)} className="block text-white/80 hover:text-white py-2 text-sm">
-                                Entrar
+                            <Link 
+                                to="/login" 
+                                onClick={() => setMobileOpen(false)}
+                                className="block text-center py-3 text-white/70 hover:text-white text-sm font-medium"
+                            >
+                                Já tenho conta (Entrar)
                             </Link>
                         )}
                     </div>
                 )}
             </div>
+
+            <UserOnboarding 
+                isOpen={showOnboarding} 
+                onClose={() => setShowOnboarding(false)}
+                onStart={() => navigate('/profissionais')}
+            />
         </header>
     )
 }

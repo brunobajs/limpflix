@@ -166,11 +166,13 @@ export default function RequestQuote() {
                 await supabase.from('chat_messages').insert({
                     conversation_id: chat.id,
                     sender_id: user.id,
-                    content: `Olá! Solicitei um orçamento para "${serviceName}".\n\nDescrição: ${description}\n\nLocalização: ${address}`
+                    message: `Olá! Solicitei um orçamento para "${serviceName}".\n\nDescrição: ${description}\n\nLocalização: ${address}`
                 })
             }
 
             navigate('/cliente/dashboard')
+            // Refresh logic might be needed but navigate should trigger it in Dashboard
+            console.log('Solicitação enviada e chats criados. Redirecionando...')
 
         } catch (err) {
             console.error(err)

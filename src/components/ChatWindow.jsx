@@ -18,10 +18,14 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
     const [sendingQuote, setSendingQuote] = useState(false)
     const messagesEndRef = useRef(null)
 
+    const [quoteRequest, setQuoteRequest] = useState(null)
+    const [showMedia, setShowMedia] = useState(true)
+
     useEffect(() => {
         if (!conversationId) return
 
         loadMessages()
+        loadQuoteRequest()
 
         // Subscribe to real-time messages
         const channel = supabase
@@ -44,6 +48,27 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
             supabase.removeChannel(channel)
         }
     }, [conversationId])
+
+    async function loadQuoteRequest() {
+        try {
+            const { data: conv } = await supabase
+                .from('chat_conversations')
+                .select('quote_request_id')
+                .eq('id', conversationId)
+                .single()
+            
+            if (conv?.quote_request_id) {
+                const { data: qr } = await supabase
+                    .from('quote_requests')
+                    .select('*')
+                    .eq('id', conv.quote_request_id)
+                    .single()
+                setQuoteRequest(qr)
+            }
+        } catch (err) {
+            console.error('Error loading quote request:', err)
+        }
+    }
 
     useEffect(() => {
         scrollToBottom()
@@ -124,7 +149,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
             await supabase.from('chat_messages').insert({
                 conversation_id: conversationId,
                 sender_id: user.id,
-                content: message
+                message: message
             })
 
             // 3. Update last message
@@ -160,7 +185,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                 .insert({
                     conversation_id: conversationId,
                     sender_id: user.id,
-                    content: newMessage.trim()
+                    message: newMessage.trim()
                 })
 
             if (error) throw error
@@ -195,9 +220,9 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
     }
 
     return (
-        <div className="flex flex-col h-[600px] bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+        <div className="flex flex-col h-[600px] bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm relative">
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between">
+            <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center text-green font-bold">
                         {otherPartyName?.[0]?.toUpperCase() || '?'}
@@ -221,6 +246,40 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                 )}
             </div>
 
+            {/* Quote Request Info Panel */}
+            {quoteRequest && (
+                <div className="bg-amber-50 border-b border-amber-100">
+                    <div className="p-3 flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="bg-amber-200 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Detalhes do Pedido</span>
+                            </div>
+                            <p className="text-xs text-gray-700 font-medium line-clamp-2">{quoteRequest.description}</p>
+                            
+                            {showMedia && quoteRequest.media_urls?.length > 0 && (
+                                <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                                    {quoteRequest.media_urls.map((url, i) => (
+                                        <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border-2 border-white shadow-sm flex-shrink-0 cursor-pointer hover:scale-105 transition-transform">
+                                            {url.toLowerCase().endsWith('.mp4') ? (
+                                                <video src={url} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <img src={url} alt="" className="w-full h-full object-cover" />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <button 
+                            onClick={() => setShowMedia(!showMedia)}
+                            className="text-[10px] text-amber-600 font-bold hover:underline whitespace-nowrap"
+                        >
+                            {showMedia ? 'Recolher' : 'Ver Fotos'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
                 {loading ? (
@@ -243,7 +302,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                                     : 'bg-white text-gray-700 border border-gray-100 rounded-bl-none'
                                     }`}
                             >
-                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                                <p className="whitespace-pre-wrap">{msg.message}</p>
                                 <div
                                     className={`text-[10px] mt-1 flex items-center gap-1 ${msg.sender_id === user.id ? 'text-white/70' : 'text-gray-400'
                                         }`}

@@ -41,15 +41,18 @@ serve(async (req) => {
       })
     }
 
-    // Formatar mensagem amigável
-    const dashboardUrl = `https://limpflix.com/prestador/dashboard`
+    // Formatar mensagem amigável (Anti-vazamento)
+    const dashboardUrl = `https://limpflix.com/dashboard`
     let whatsappMessage = ''
+    
     if (type === 'new_message') {
-      whatsappMessage = `*LimpFlix:* Você recebeu uma nova mensagem!\n\n"${content}"\n\nAcesse para responder: ${dashboardUrl}`
+      whatsappMessage = `*LimpFlix:* Você recebeu uma nova mensagem!\n\nAcesse seu painel para ler e responder: ${dashboardUrl}`
+    } else if (type === 'new_quote_request') {
+      whatsappMessage = `*LimpFlix:* Você tem uma nova solicitação de orçamento!\n\nAcesse seu dashboard para ver os detalhes e iniciar o chat: ${dashboardUrl}`
     } else if (type === 'new_quote') {
-      whatsappMessage = `*LimpFlix:* Um novo orçamento foi enviado para você!\n\n${content}\n\nAcesse para conferir: ${dashboardUrl}`
+      whatsappMessage = `*LimpFlix:* Você recebeu uma proposta de orçamento!\n\nAcesse seu painel para conferir os detalhes e realizar o pagamento: ${dashboardUrl}`
     } else {
-      whatsappMessage = `*LimpFlix:* ${content}\n\nLink: ${dashboardUrl}`
+      whatsappMessage = `*LimpFlix:* Você tem uma nova notificação!\n\nAcesse para conferir: ${dashboardUrl}`
     }
 
     // DISPARO VIA WHATSAPP (Exemplo com Webhook Generic ou API Direta)
