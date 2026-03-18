@@ -21,23 +21,7 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'chat_conversations',
-                    filter: `client_id=eq.${user.id}`
-                },
-                () => loadConversations()
-            )
-            .subscribe()
-
-        // Also check as provider
-        const providerChannel = supabase
-            .channel('provider:chat_conversations')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'chat_conversations',
-                    filter: `provider_id=in.(select id from service_providers where user_id = '${user.id}')`
+                    table: 'chat_conversations'
                 },
                 () => loadConversations()
             )
@@ -45,7 +29,6 @@ export default function ChatList({ onSelectConversation, selectedId }) {
 
         return () => {
             supabase.removeChannel(channel)
-            supabase.removeChannel(providerChannel)
         }
     }, [user])
 
@@ -62,7 +45,7 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                 .from('chat_conversations')
                 .select(`
                     *,
-                    service_providers (id, trade_name, responsible_name, profile_image)
+                    service_providers (id, trade_name, responsible_name, profile_image, user_id)
                 `)
                 .order('last_message_at', { ascending: false })
 
@@ -117,7 +100,11 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                 ) : (
                     filteredConversations.map(conv => {
                         const isUserProvider = conv.provider_id && conv.service_providers?.id === conv.provider_id && user.id === conv.service_providers?.user_id
-                        const displayName = isUserProvider ? conv.client_name : (conv.service_providers?.trade_name || conv.service_providers?.responsible_name || 'Profissional')
+
+                        // Quando usuário é provider, mostra client_name; quando é client, mostra provider_name/trade_name
+                        const displayName = isUserProvider
+                            ? (conv.client_name || 'Cliente')
+                            : (conv.provider_name || conv.service_providers?.trade_name || conv.service_providers?.responsible_name || 'Profissional')
 
                         // Lógica de Notificação: Verifica se a última mensagem é posterior à última leitura do usuário
                         const lastReadAt = isUserProvider ? conv.provider_last_read_at : conv.client_last_read_at

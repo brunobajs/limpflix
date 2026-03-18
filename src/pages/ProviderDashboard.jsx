@@ -1013,7 +1013,7 @@ export default function ProviderDashboard() {
                         <div className="md:col-span-2 h-full">
                             <ChatWindow
                                 conversationId={selectedChat?.id}
-                                otherPartyName={selectedChat?.client_name}
+                                otherPartyName={selectedChat?.client_name || selectedChat?.service_providers?.trade_name || 'Cliente'}
                             />
                         </div>
                     </div>
