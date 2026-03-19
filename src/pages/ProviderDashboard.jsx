@@ -89,6 +89,12 @@ export default function ProviderDashboard() {
     const [isWithdrawing, setIsWithdrawing] = useState(false)
     const [academyContents, setAcademyContents] = useState([])
     const [loadingAcademy, setLoadingAcademy] = useState(false)
+    const [quotes, setQuotes] = useState([])
+    const [pendingQuotesCount, setPendingQuotesCount] = useState(0)
+    const [selectedQuote, setSelectedQuote] = useState(null)
+    const [showQuoteResponseModal, setShowQuoteResponseModal] = useState(false)
+    const [quoteResponseValue, setQuoteResponseValue] = useState('')
+    const [quoteResponseDescription, setQuoteResponseDescription] = useState('')
 
     // 1. Initial Data Loading (only when user changes)
     useEffect(() => {
@@ -111,7 +117,7 @@ export default function ProviderDashboard() {
         const tab = searchParams.get('tab')
         const tabsList = [
             { id: 'overview' }, { id: 'bookings' }, { id: 'wallet' },
-            { id: 'reviews' }, { id: 'referrals' }, { id: 'messages' }, { id: 'settings' }
+            { id: 'reviews' }, { id: 'referrals' }, { id: 'messages' }, { id: 'settings' }, { id: 'quotes' }
         ]
         if (tab && tabsList.some(t => t.id === tab)) {
             setActiveTab(tab)
@@ -268,6 +274,20 @@ export default function ProviderDashboard() {
 
                 setBookings(bookingData || [])
                 fetchTransactions(providerData.id)
+
+                // Load quotes for this provider
+                const { data: quotesData } = await supabase
+                    .from('service_quotes')
+                    .select(`
+                        *,
+                        profiles:client_id (full_name),
+                        quote_requests (description, service_name, created_at)
+                    `)
+                    .eq('provider_id', providerData.id)
+                    .order('created_at', { ascending: false })
+
+                setQuotes(quotesData || [])
+                setPendingQuotesCount(quotesData?.filter(q => q.status === 'pending').length || 0)
             }
         } catch (err) {
             console.error('Error loading dashboard:', err)
@@ -526,6 +546,7 @@ export default function ProviderDashboard() {
         { id: 'referrals', label: 'Indicações', icon: Users },
         { id: 'messages', label: 'Mensagens', icon: MessageSquare },
         { id: 'academy', label: 'Academia LimpFlix', icon: GraduationCap },
+        { id: 'quotes', label: 'Orçamentos', icon: FileText, badge: pendingQuotesCount },
         { id: 'settings', label: 'Configurações', icon: Settings },
         { id: 'verification', label: 'Verificações', icon: Shield },
     ]
@@ -1083,7 +1104,272 @@ export default function ProviderDashboard() {
                             </div>
                         )}
                     </div>
-                )  }
+                )}
+
+                {/* Quotes Tab */}
+                {activeTab === 'quotes' && (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* Header with stats */}
+                        <div className="bg-gradient-to-br from-green to-emerald-600 rounded-2xl p-8 text-white relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-10">
+                                <FileText className="w-32 h-32" />
+                            </div>
+                            <div className="relative z-10">
+                                <h2 className="text-2xl font-bold mb-2">Orçamentos Recebidos</h2>
+                                <p className="text-white/80 text-sm mb-4">
+                                    Gerencie todas as solicitações de orçamento enviadas pelos clientes
+                                </p>
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2">
+                                        <span className="text-2xl font-bold">{quotes.length}</span>
+                                        <span className="text-xs ml-2 opacity-80">Total</span>
+                                    </div>
+                                    <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2">
+                                        <span className="text-2xl font-bold">{pendingQuotesCount}</span>
+                                        <span className="text-xs ml-2 opacity-80">Pendentes</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quotes List */}
+                        {quotes.length === 0 ? (
+                            <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
+                                <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-gray-700 mb-2">Nenhum orçamento recebido</h3>
+                                <p className="text-gray-500">Quando os clientes solicitarem orçamentos, eles aparecerão aqui.</p>
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50">
+                                            <tr className="text-gray-400 text-[10px] uppercase font-black tracking-wider">
+                                                <th className="px-6 py-4">Cliente</th>
+                                                <th className="px-6 py-4">Serviço</th>
+                                                <th className="px-6 py-4">Descrição</th>
+                                                <th className="px-6 py-4">Valor</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4">Data</th>
+                                                <th className="px-6 py-4">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {quotes.map(quote => (
+                                                <tr key={quote.id} className="hover:bg-gray-50/80 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">
+                                                                {quote.profiles?.full_name?.charAt(0) || 'C'}
+                                                            </div>
+                                                            <p className="text-sm font-bold text-gray-900">{quote.profiles?.full_name || 'Cliente'}</p>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <p className="text-sm font-medium text-gray-900">{quote.quote_requests?.service_name || 'Serviço'}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4 max-w-xs">
+                                                        <p className="text-sm text-gray-600 truncate">{quote.quote_requests?.description || quote.description || '-'}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {quote.amount ? (
+                                                            <p className="text-sm font-bold text-green">R$ {Number(quote.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">Não informado</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${
+                                                            quote.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                                            quote.status === 'sent' ? 'bg-blue-100 text-blue-600' :
+                                                            quote.status === 'accepted' ? 'bg-green-100 text-green' :
+                                                            quote.status === 'rejected' ? 'bg-red-100 text-red-600' :
+                                                            'bg-gray-100 text-gray-600'
+                                                        }`}>
+                                                            {quote.status === 'pending' ? 'Pendente' :
+                                                             quote.status === 'sent' ? 'Enviado' :
+                                                             quote.status === 'accepted' ? 'Aceito' :
+                                                             quote.status === 'rejected' ? 'Rejeitado' :
+                                                             quote.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                                        {new Date(quote.created_at).toLocaleDateString('pt-BR')}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {quote.status === 'pending' && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedQuote(quote)
+                                                                    setQuoteResponseValue(quote.amount || '')
+                                                                    setQuoteResponseDescription(quote.description || '')
+                                                                    setShowQuoteResponseModal(true)
+                                                                }}
+                                                                className="bg-green hover:bg-green-dark text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                                            >
+                                                                Responder
+                                                            </button>
+                                                        )}
+                                                        {quote.status !== 'pending' && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedQuote(quote)
+                                                                    setShowQuoteResponseModal(true)
+                                                                }}
+                                                                className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                                            >
+                                                                Ver Detalhes
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Quote Response Modal */}
+                {showQuoteResponseModal && selectedQuote && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy/90 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-scale-up">
+                            <div className="bg-gradient-to-br from-green to-emerald-600 p-6 text-white">
+                                <h3 className="text-xl font-bold">
+                                    {selectedQuote.status === 'pending' ? 'Responder Orçamento' : 'Detalhes do Orçamento'}
+                                </h3>
+                                <p className="text-white/80 text-sm mt-1">
+                                    {selectedQuote.profiles?.full_name || 'Cliente'}
+                                </p>
+                                <button
+                                    onClick={() => setShowQuoteResponseModal(false)}
+                                    className="absolute top-4 right-4 text-white/60 hover:text-white"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Serviço</label>
+                                    <p className="text-gray-900 font-medium">{selectedQuote.quote_requests?.service_name || 'Serviço'}</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                                    <p className="text-gray-600 text-sm">{selectedQuote.quote_requests?.description || selectedQuote.description || '-'}</p>
+                                </div>
+
+                                {selectedQuote.status === 'pending' ? (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Valor do Orçamento (R$)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={quoteResponseValue}
+                                                onChange={(e) => setQuoteResponseValue(e.target.value)}
+                                                placeholder="0.00"
+                                                step="0.01"
+                                                className="w-full rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50 text-lg font-bold text-green"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Mensagem (opcional)
+                                            </label>
+                                            <textarea
+                                                value={quoteResponseDescription}
+                                                onChange={(e) => setQuoteResponseDescription(e.target.value)}
+                                                placeholder="Adicione detalhes sobre seu orçamento..."
+                                                className="w-full rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50 h-24"
+                                            />
+                                        </div>
+
+                                        <div className="flex gap-3 pt-4">
+                                            <button
+                                                onClick={async () => {
+                                                    if (!quoteResponseValue) {
+                                                        alert('Informe um valor para o orçamento')
+                                                        return
+                                                    }
+                                                    try {
+                                                        const { error } = await supabase
+                                                            .from('service_quotes')
+                                                            .update({
+                                                                amount: parseFloat(quoteResponseValue),
+                                                                description: quoteResponseDescription,
+                                                                status: 'sent',
+                                                                updated_at: new Date().toISOString()
+                                                            })
+                                                            .eq('id', selectedQuote.id)
+
+                                                        if (error) throw error
+
+                                                        // Also send message in chat
+                                                        if (selectedQuote.conversation_id) {
+                                                            await supabase.from('chat_messages').insert({
+                                                                conversation_id: selectedQuote.conversation_id,
+                                                                sender_id: user.id,
+                                                                sender_type: 'provider',
+                                                                message: `Orçamento enviado: R$ ${parseFloat(quoteResponseValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${quoteResponseDescription ? '\n\n' + quoteResponseDescription : ''}`,
+                                                                is_quote: true,
+                                                                quote_amount: parseFloat(quoteResponseValue)
+                                                            })
+                                                        }
+
+                                                        alert('Orçamento enviado com sucesso!')
+                                                        setShowQuoteResponseModal(false)
+                                                        loadProviderData()
+                                                    } catch (err) {
+                                                        console.error('Error sending quote:', err)
+                                                        alert('Erro ao enviar orçamento')
+                                                    }
+                                                }}
+                                                className="flex-1 bg-green hover:bg-green-dark text-white font-bold py-3 rounded-xl transition-all"
+                                            >
+                                                Enviar Orçamento
+                                            </button>
+                                            <button
+                                                onClick={() => setShowQuoteResponseModal(false)}
+                                                className="px-6 py-3 text-gray-500 hover:bg-gray-100 rounded-xl font-medium transition-colors"
+                                            >
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="space-y-4 pt-4">
+                                        <div className="bg-gray-50 rounded-xl p-4">
+                                            <p className="text-sm text-gray-500 mb-1">Valor Orçado</p>
+                                            <p className="text-2xl font-bold text-green">
+                                                {selectedQuote.amount ? `R$ ${Number(selectedQuote.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Não informado'}
+                                            </p>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-xl p-4">
+                                            <p className="text-sm text-gray-500 mb-1">Status</p>
+                                            <p className="text-lg font-bold text-gray-900">
+                                                {selectedQuote.status === 'accepted' ? 'Aceito ✓' :
+                                                 selectedQuote.status === 'rejected' ? 'Rejeitado' :
+                                                 selectedQuote.status === 'sent' ? 'Enviado' : selectedQuote.status}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowQuoteResponseModal(false)}
+                                            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-all"
+                                        >
+                                            Fechar
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Settings Tab */}
                 {activeTab === 'settings' && (

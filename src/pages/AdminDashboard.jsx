@@ -6,7 +6,8 @@ import {
     LayoutDashboard, Users, Building2, MapPin,
     TrendingUp, Calendar, Search, Filter,
     Download, ArrowUpRight, Loader2, PieChart,
-    BarChart3, Settings, Star, CheckCircle2
+    BarChart3, Settings, Star, CheckCircle2,
+    MessageSquare, FileText, Wallet
 } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -29,6 +30,9 @@ export default function AdminDashboard() {
     const [recentBookings, setRecentBookings] = useState([])
     const [activeTab, setActiveTab] = useState('overview')
     const [adminProviders, setAdminProviders] = useState([])
+    const [quotes, setQuotes] = useState([])
+    const [conversations, setConversations] = useState([])
+    const [allClients, setAllClients] = useState([])
 
     useEffect(() => {
         if (!authLoading) {
@@ -39,13 +43,14 @@ export default function AdminDashboard() {
 
     async function checkAdmin() {
         if (!user) {
-            navigate('/login')
+            navigate('/admin/login')
             return
         }
 
         if (authProfile?.role !== 'admin') {
             console.warn('Acesso negado: usuário não é admin.')
-            navigate('/')
+            navigate('/admin/login')
+            return
         }
     }
 
@@ -97,6 +102,36 @@ export default function AdminDashboard() {
             setRecentBookings(recent || [])
             setCityData(Object.values(cityMap).sort((a, b) => b.providers - a.providers))
 
+            // 4. Load all clients
+            const { data: clientsData } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, created_at')
+                .eq('role', 'client')
+                .order('created_at', { ascending: false })
+            setAllClients(clientsData || [])
+
+            // 5. Load all quotes
+            const { data: quotesData } = await supabase
+                .from('service_quotes')
+                .select(`
+                    *,
+                    service_providers (trade_name, responsible_name),
+                    profiles (full_name)
+                `)
+                .order('created_at', { ascending: false })
+            setQuotes(quotesData || [])
+
+            // 6. Load all conversations
+            const { data: conversationsData } = await supabase
+                .from('chat_conversations')
+                .select(`
+                    *,
+                    service_providers (trade_name, responsible_name),
+                    profiles:client_id (full_name)
+                `)
+                .order('created_at', { ascending: false })
+            setConversations(conversationsData || [])
+
         } catch (err) {
             console.error('Error loading admin data:', err)
         } finally {
@@ -123,12 +158,13 @@ export default function AdminDashboard() {
 
                 <nav className="flex-1 px-4 mt-4 space-y-1">
                     {[
-                        { id: 'overview', label: 'Estatísticas', icon: LayoutDashboard },
-                        { id: 'providers', label: 'Prestadores', icon: Building2 },
+                        { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
                         { id: 'clients', label: 'Clientes', icon: Users },
+                        { id: 'providers', label: 'Prestadores', icon: Building2 },
+                        { id: 'quotes', label: 'Orçamentos', icon: FileText },
+                        { id: 'conversations', label: 'Conversas', icon: MessageSquare },
                         { id: 'cities', label: 'Cidades', icon: MapPin },
-                        { id: 'marketing', label: 'Marketing', icon: TrendingUp },
-                        { id: 'settings', label: 'Configurações', icon: Settings },
+                        { id: 'marketing', label: 'Financeiro', icon: Wallet },
                     ].map(item => (
                         <button
                             key={item.id}
@@ -154,9 +190,13 @@ export default function AdminDashboard() {
                 {/* Topbar */}
                 <header className="bg-white border-b border-gray-100 py-4 px-8 flex items-center justify-between sticky top-0 z-10">
                     <h1 className="text-xl font-bold text-gray-800">
-                        {activeTab === 'overview' && 'Visão Geral do Sistema'}
+                        {activeTab === 'overview' && 'Dashboard Geral'}
                         {activeTab === 'providers' && 'Gestão de Prestadores'}
+                        {activeTab === 'clients' && 'Lista de Clientes'}
+                        {activeTab === 'quotes' && 'Orçamentos'}
+                        {activeTab === 'conversations' && 'Conversas'}
                         {activeTab === 'cities' && 'Distribuição Geográfica'}
+                        {activeTab === 'marketing' && 'Financeiro'}
                     </h1>
                     <div className="flex items-center gap-4">
                         <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50">
@@ -327,18 +367,155 @@ export default function AdminDashboard() {
                     )}
 
                     {activeTab === 'clients' && (
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center space-y-6">
-                            <div className="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto text-purple-600">
-                                <Users className="w-10 h-10" />
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-gray-900">Lista de Clientes</h2>
+                                <span className="text-xs font-bold text-gray-400 uppercase">{allClients.length} CADASTRADOS</span>
                             </div>
-                            <h2 className="text-2xl font-black text-navy">Total de Clientes</h2>
-                            <p className="text-5xl font-black text-purple-600">{stats.totalClients}</p>
-                            <p className="text-gray-500 max-w-sm mx-auto">
-                                No momento, o sistema registra {stats.totalClients} clientes únicos na plataforma.
-                            </p>
-                            <div className="pt-8 border-t border-gray-50">
-                                <p className="text-xs text-gray-400 uppercase font-black tracking-widest">Dica do Sistema</p>
-                                <p className="text-sm text-gray-600">Para ver a cidade dos clientes, você pode solicitar a inclusão de um campo de endereço no perfil nas próximas atualizações.</p>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50/50">
+                                        <tr className="text-gray-400 text-[10px] uppercase font-black tracking-wider">
+                                            <th className="px-6 py-4">Nome</th>
+                                            <th className="px-6 py-4">Email</th>
+                                            <th className="px-6 py-4">Data de Cadastro</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {allClients.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={3} className="px-6 py-8 text-center text-gray-400">Nenhum cliente cadastrado</td>
+                                            </tr>
+                                        ) : allClients.map(client => (
+                                            <tr key={client.id} className="hover:bg-gray-50/80 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">
+                                                            {client.full_name?.charAt(0) || 'C'}
+                                                        </div>
+                                                        <p className="text-sm font-bold text-gray-900">{client.full_name || 'Sem nome'}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600">{client.email || 'Email não disponível'}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">{new Date(client.created_at).toLocaleDateString('pt-BR')}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'quotes' && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-gray-900">Todos os Orçamentos</h2>
+                                <span className="text-xs font-bold text-gray-400 uppercase">{quotes.length} ORÇAMENTOS</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50/50">
+                                        <tr className="text-gray-400 text-[10px] uppercase font-black tracking-wider">
+                                            <th className="px-6 py-4">Cliente</th>
+                                            <th className="px-6 py-4">Prestador</th>
+                                            <th className="px-6 py-4">Valor</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Data</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {quotes.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-gray-400">Nenhum orçamento encontrado</td>
+                                            </tr>
+                                        ) : quotes.map(quote => (
+                                            <tr key={quote.id} className="hover:bg-gray-50/80 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">
+                                                            {quote.profiles?.full_name?.charAt(0) || 'C'}
+                                                        </div>
+                                                        <p className="text-sm font-bold text-gray-900">{quote.profiles?.full_name || 'N/A'}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm font-bold text-gray-900">{quote.service_providers?.trade_name || quote.service_providers?.responsible_name || 'N/A'}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm font-bold text-green">R$ {Number(quote.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${
+                                                        quote.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                                        quote.status === 'sent' ? 'bg-blue-100 text-blue-600' :
+                                                        quote.status === 'accepted' ? 'bg-green-100 text-green' :
+                                                        'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {quote.status === 'pending' ? 'Pendente' :
+                                                         quote.status === 'sent' ? 'Enviado' :
+                                                         quote.status === 'accepted' ? 'Aceito' :
+                                                         quote.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">{new Date(quote.created_at).toLocaleDateString('pt-BR')}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'conversations' && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-gray-900">Todas as Conversas</h2>
+                                <span className="text-xs font-bold text-gray-400 uppercase">{conversations.length} CONVERSAS</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50/50">
+                                        <tr className="text-gray-400 text-[10px] uppercase font-black tracking-wider">
+                                            <th className="px-6 py-4">Cliente</th>
+                                            <th className="px-6 py-4">Prestador</th>
+                                            <th className="px-6 py-4">Última Mensagem</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Data</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {conversations.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-gray-400">Nenhuma conversa encontrada</td>
+                                            </tr>
+                                        ) : conversations.map(conv => (
+                                            <tr key={conv.id} className="hover:bg-gray-50/80 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">
+                                                            {conv.profiles?.full_name?.charAt(0) || 'C'}
+                                                        </div>
+                                                        <p className="text-sm font-bold text-gray-900">{conv.profiles?.full_name || conv.client_name || 'N/A'}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm font-bold text-gray-900">{conv.service_providers?.trade_name || conv.provider_name || 'N/A'}</p>
+                                                </td>
+                                                <td className="px-6 py-4 max-w-xs">
+                                                    <p className="text-sm text-gray-600 truncate">{conv.last_message || 'Sem mensagens'}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${
+                                                        conv.status === 'active' ? 'bg-green-100 text-green' : 'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {conv.status === 'active' ? 'Ativa' : 'Encerrada'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">{new Date(conv.created_at).toLocaleDateString('pt-BR')}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}

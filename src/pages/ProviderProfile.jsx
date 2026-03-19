@@ -127,18 +127,18 @@ export default function ProviderProfile() {
                             {isAuthenticated ? (
                                 <Link
                                     to={`/solicitar-orcamento?profissional=${provider.id}`}
-                                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
+                                    className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-6 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg text-center justify-center"
                                 >
                                     <Calendar className="w-5 h-5" />
-                                    Orçamento
+                                    Solicitar Orçamento
                                 </Link>
                             ) : (
                                 <button
                                     onClick={() => setShowGuestAlert(true)}
-                                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
+                                    className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-6 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg text-center justify-center"
                                 >
                                     <Calendar className="w-5 h-5" />
-                                    Orçamento
+                                    Solicitar Orçamento
                                 </button>
                             )}
                         </div>

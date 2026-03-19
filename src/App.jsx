@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
@@ -14,10 +14,50 @@ import ClientDashboard from './pages/ClientDashboard'
 import PaymentPage from './pages/PaymentPage'
 import PaymentSuccess from './pages/PaymentSuccess'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminLogin from './pages/AdminLogin'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import InstallPrompt from './components/InstallPrompt'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabase'
+
+// Protected Route Component for Admin
+function AdminRoute({ children }) {
+    const [loading, setLoading] = useState(true)
+    const [isAdmin, setIsAdmin] = useState(false)
+
+    useEffect(() => {
+        const checkAdmin = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) {
+                setLoading(false)
+                return
+            }
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single()
+            setIsAdmin(profile?.role === 'admin')
+            setLoading(false)
+        }
+        checkAdmin()
+    }, [])
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="w-8 h-8 text-green animate-spin border-4 border-green border-t-transparent rounded-full" />
+            </div>
+        )
+    }
+
+    if (!isAdmin) {
+        return <Navigate to="/admin/login" replace />
+    }
+
+    return children
+}
 
 // ScrollToTop component
 function ScrollToTop() {
@@ -59,7 +99,12 @@ function App() {
                     <Route path="/pagamento/sucesso" element={<PaymentSuccess />} />
                     <Route path="/cliente/dashboard" element={<ClientDashboard />} />
                     <Route path="/dashboard" element={<ProviderDashboard />} />
-                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/admin" element={
+                        <AdminRoute>
+                            <AdminDashboard />
+                        </AdminRoute>
+                    } />
                     <Route path="/termos" element={<Layout><Terms /></Layout>} />
                     <Route path="/privacidade" element={<Layout><Privacy /></Layout>} />
 
