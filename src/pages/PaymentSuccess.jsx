@@ -53,8 +53,8 @@ export default function PaymentSuccess() {
                         client_id: clientId,
                         service_name: serviceName || 'Limpeza/Serviço especial',
                         total_amount: amount,
-                        platform_fee: amount * 0.06, // 5% plataforma + 1% indicação
-                        provider_net_amount: amount * 0.94,
+                        platform_fee: amount * 0.10, // 5% plataforma + 1% indicação
+                        provider_net_amount: amount * 0.90,
                         status: 'confirmed',
                         payment_status: 'paid',
                         quote_id: serviceQuoteId || null
@@ -76,7 +76,7 @@ export default function PaymentSuccess() {
                     .update({ is_busy: true })
                     .eq('id', providerId)
 
-                // 3. REPASSE AUTOMÁTICO (SPLIT 94/5/1)
+                // 3. REPASSE AUTOMÁTICO (SPLIT 90/8/2)
                 await handleAutomaticRepasse(providerId, clientId, amount)
             }
 
@@ -116,8 +116,8 @@ export default function PaymentSuccess() {
             // 5% Plataforma
             // 1% Indicação (pode ser 0.5% para o indicador do cliente e 0.5% para o do profissional)
 
-            let providerAmt = totalAmount * 0.94
-            let totalReferralAmt = totalAmount * 0.01
+            let providerAmt = totalamount * 0.90
+            let totalReferralAmt = totalAmount * 0.02
 
             // 3. Executar Repasse ao Prestador (94%)
             try {
@@ -209,3 +209,4 @@ export default function PaymentSuccess() {
         </div>
     )
 }
+

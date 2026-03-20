@@ -5,28 +5,28 @@
  * 
  * Distribuição dos valores:
  * Com uma indicação:
- * - 94% para o prestador do serviço
+ * - 90% para o prestador do serviço
  * - 5% para a plataforma
  * - 1% para o indicador
  * 
  * Com duas indicações (cliente e prestador):
- * - 94% para o prestador do serviço
+ * - 90% para o prestador do serviço
  * - 5% para a plataforma
  * - 0.5% para quem indicou o cliente
  * - 0.5% para quem indicou o prestador
  * 
  * Sem indicação:
- * - 94% para o prestador do serviço
+ * - 90% para o prestador do serviço
  * - 6% para a plataforma
  */
 
 import { supabase } from './supabase'
 
 // Constantes para os percentuais de distribuição
-const PROVIDER_FEE = 0.94; // 94%
-const BASE_PLATFORM_FEE = 0.06; // 6% (sem indicação)
-const REFERRAL_PLATFORM_FEE = 0.05; // 5% (com indicação)
-const SINGLE_REFERRAL_FEE = 0.01; // 1% para indicação única
+const PROVIDER_FEE = 0.90; // 90%
+const BASE_PLATFORM_FEE = 0.10; // 6% (sem indicação)
+const REFERRAL_PLATFORM_FEE = 0.08; // 5% (com indicação)
+const SINGLE_REFERRAL_FEE = 0.02; // 1% para indicação única
 const SPLIT_REFERRAL_FEE = 0.005; // 0.5% quando há duas indicações
 
 /**
@@ -105,11 +105,11 @@ export async function processSplitPayment({
     };
 
     try {
-        // 1. Pagamento principal para o prestador (94%)
+        // 1. Pagamento principal para o prestador (90%)
         results.provider = await sendPayoutPix({
             pixKey: providerPixKey,
             amount: amounts.providerAmount,
-            description: `Pagamento ${description} (94%)`
+            description: `Pagamento ${description} (90%)`
         });
 
         // 2. Pagamento da comissão de indicação do cliente (0.5%, se houver)
@@ -138,3 +138,4 @@ export async function processSplitPayment({
         throw new Error(`Falha no processamento do split: ${error.message}`);
     }
 }
+
