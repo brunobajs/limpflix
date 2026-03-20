@@ -82,7 +82,7 @@ export default function AdminDashboard() {
             })
 
             // 2. City Distribution & Providers List
-            const { data: providers } = await supabase.from('service_providers').select('*').order('created_at', { ascending: false })
+            const { data: providers } = await supabase.rpc('get_admin_providers')
             setAdminProviders(providers || [])
 
             const cityMap = {}
@@ -103,11 +103,7 @@ export default function AdminDashboard() {
             setCityData(Object.values(cityMap).sort((a, b) => b.providers - a.providers))
 
             // 4. Load all clients
-            const { data: clientsData } = await supabase
-                .from('profiles')
-                .select('id, full_name, email, created_at')
-                .eq('role', 'client')
-                .order('created_at', { ascending: false })
+            const { data: clientsData } = await supabase.rpc('get_admin_clients')
             setAllClients(clientsData || [])
 
             // 5. Load all quotes
@@ -594,3 +590,5 @@ function Clock(props) {
         </svg>
     )
 }
+
+
