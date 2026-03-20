@@ -86,12 +86,12 @@ export default function RequestQuote() {
                 const filePath = `quotes/${fileName}`
 
                 const { error: uploadError } = await supabase.storage
-                    .from('providers-media') // Reutilizando bucket ou mudando para específico
+                    .from('quote-images') // Reutilizando bucket ou mudando para específico
                     .upload(filePath, file)
 
                 if (!uploadError) {
                     const { data } = supabase.storage
-                        .from('providers-media')
+                        .from('quote-images')
                         .getPublicUrl(filePath)
                     mediaUrls.push(data.publicUrl)
                 }
