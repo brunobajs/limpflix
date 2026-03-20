@@ -1,7 +1,7 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, Shield, X, Plus } from 'lucide-react'
+import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus } from 'lucide-react'
 import React from 'react'
 class LocalErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -199,7 +199,7 @@ export default function ClientDashboard() {
                             <p className="text-xs text-gray-500">Suas conversas e solicitacoes</p>
                         </div>
                     </div>
-                    <Link to="/profissionais" className="bg-green text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-dark transition-colors">
+                    <Link to="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 font-medium text-sm mr-2"><ArrowLeft className="w-4 h-4" />Inicio</Link><Link to="/profissionais" className="bg-green text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-dark transition-colors">
                         <Plus className="w-4 h-4" />
                         Nova Solicitacao
                     </Link>
@@ -401,3 +401,5 @@ export default function ClientDashboard() {
         </LocalErrorBoundary>
     )
 }
+
+
