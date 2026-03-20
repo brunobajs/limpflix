@@ -545,7 +545,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Lucro Plataforma</h3>
                                 <p className="text-3xl font-black text-blue-900">R$ {stats.financials.platformShare.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Referente a 5-6% de taxa</p>
+                                <p className="text-xs text-gray-500">Referente a 8% de taxa</p>
                             </div>
                             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
                                 <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
@@ -553,7 +553,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pago aos Profissionais</h3>
                                 <p className="text-3xl font-black text-green-900">R$ {stats.financials.providerShare.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Referente a 94% dos serviços</p>
+                                <p className="text-xs text-gray-500">Referente a 90% dos serviços</p>
                             </div>
                             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
                                 <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto">
@@ -561,7 +561,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pagas por Indicação</h3>
                                 <p className="text-3xl font-black text-purple-900">R$ {stats.financials.referralShare.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Referente a 1% de cashback</p>
+                                <p className="text-xs text-gray-500">Referente a 2% de cashback</p>
                             </div>
                         </div>
                     )}
@@ -590,5 +590,6 @@ function Clock(props) {
         </svg>
     )
 }
+
 
 
