@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus } from 'lucide-react'
+import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus, Trash2 } from 'lucide-react'
 import React from 'react'
 class LocalErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -134,6 +134,13 @@ export default function ClientDashboard() {
             checkActiveBooking(activeBooking.provider_id)
         } catch (err) { console.error(err); alert('Erro ao enviar avaliacao.') }
         finally { setSubmittingReview(false) }
+    }
+
+    async function deleteChat(chatId) {
+        if (!window.confirm('Tem certeza que deseja apagar esta conversa?')) return
+        await supabase.from('chat_conversations').update({ deleted_by_client: true }).eq('id', chatId)
+        setChats(prev => prev.filter(c => c.id !== chatId))
+        if (selectedChat?.id === chatId) setSelectedChat(null)
     }
 
     function scrollToBottom() { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }
@@ -401,5 +408,8 @@ export default function ClientDashboard() {
         </LocalErrorBoundary>
     )
 }
+
+
+
 
 
