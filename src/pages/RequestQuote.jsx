@@ -108,7 +108,8 @@ export default function RequestQuote() {
                     latitude: location?.latitude,
                     longitude: location?.longitude,
                     address,
-                    status: 'open'
+                    status: 'open',
+                    provider_id: null
                 })
                 .select()
                 .single()
@@ -317,3 +318,4 @@ export default function RequestQuote() {
         </div>
     )
 }
+
