@@ -788,7 +788,7 @@ export default function ProviderDashboard() {
                                         <GraduationCap className="w-6 h-6 text-blue-600" />
                                     </div>
                                     <div className="text-left">
-                                        <h3 className="font-bold text-gray-900 leading-tight">Cursos e Treinamentos</h3>
+                                        <h3 className="font-bold text-gray-900 leading-tight">Academia Limpflix</h3>
                                         <p className="text-xs text-gray-400">Capacite-se para ganhar mais</p>
                                     </div>
                                 </div>
