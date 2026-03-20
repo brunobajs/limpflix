@@ -1,28 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import {
-    Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, Shield, X
-} from 'lucide-react'
-
+import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, Shield, X, Plus } from 'lucide-react'
 import React from 'react'
 class LocalErrorBoundary extends React.Component {
-    constructor(props) {
-        super(props)
-        this.state = { hasError: false, error: null }
-    }
-    static getDerivedStateFromError(error) {
-        return { hasError: true, error }
-    }
-    componentDidCatch(error, errorInfo) {
-        console.error("Client Dashboard component crash:", error, errorInfo)
-    }
+    constructor(props) { super(props); this.state = { hasError: false, error: null } }
+    static getDerivedStateFromError(error) { return { hasError: true, error } }
+    componentDidCatch(error, errorInfo) { console.error("Dashboard crash:", error, errorInfo) }
     render() {
         if (this.state.hasError) {
             return (
-                <div className="p-8 bg-red-50 text-red-800 rounded-2xl border border-red-100 m-4">
-                    <h2 className="font-bold mb-2">Ops! Algo deu errado no painel do cliente.</h2>
-                    <p className="text-xs opacity-70 mb-4">{this.state.error?.message}</p>
+                <div className="p-8 bg-red-50 text-red-800 rounded-2xl m-4">
+                    <h2 className="font-bold mb-2">Ops! Algo deu errado.</h2>
                     <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Recarregar</button>
                 </div>
             )
@@ -48,63 +37,43 @@ export default function ClientDashboard() {
     const [reviewRating, setReviewRating] = useState(5)
     const [reviewText, setReviewText] = useState('')
     const [submittingReview, setSubmittingReview] = useState(false)
+    const [pendingQuotes, setPendingQuotes] = useState([])
+    const [profileName, setProfileName] = useState('')
     const messagesEndRef = useRef(null)
 
-    // Poll for messages in real-time (simplified)
-    useEffect(() => {
-        if (!authLoading) {
-            checkUser()
-        }
-    }, [authLoading, user])
+    useEffect(() => { if (!authLoading) { checkUser() } }, [authLoading, user])
 
     useEffect(() => {
         if (selectedChat) {
             loadMessages(selectedChat.id)
-
-            // Real-time subscription — sem polling!
             const channel = supabase
                 .channel(`client-chat:${selectedChat.id}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'chat_messages',
-                        filter: `conversation_id=eq.${selectedChat.id}`
-                    },
-                    (payload) => {
-                        setMessages(prev => [...prev, payload.new])
-                        scrollToBottom()
-                    }
-                )
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${selectedChat.id}` },
+                    (payload) => { setMessages(prev => [...prev, payload.new]); scrollToBottom() })
                 .subscribe()
-
             return () => supabase.removeChannel(channel)
         }
     }, [selectedChat])
 
     async function checkUser() {
-        if (!user) {
-            navigate('/login')
-            return
-        }
+        if (!user) { navigate('/login'); return }
         loadChats(user.id)
         loadPendingQuotes(user.id)
+        loadProfileName(user.id)
     }
 
-    const [pendingQuotes, setPendingQuotes] = useState([])
+    async function loadProfileName(userId) {
+        const { data } = await supabase.from('profiles').select('full_name').eq('id', userId).single()
+        if (data) setProfileName(data.full_name)
+    }
 
     async function loadPendingQuotes(userId) {
         const { data } = await supabase
             .from('service_quotes')
-            .select(`
-                *,
-                provider:service_providers(trade_name, responsible_name, profile_image)
-            `)
+            .select('*, provider:service_providers(trade_name, responsible_name, profile_image)')
+            .eq('client_id', userId)
             .eq('status', 'pending')
-            // O ideal seria filtrar por client_id através da conversation_id
             .order('created_at', { ascending: false })
-        
         setPendingQuotes(data || [])
     }
 
@@ -112,502 +81,323 @@ export default function ClientDashboard() {
         try {
             const { data, error } = await supabase
                 .from('chat_conversations')
-                .select(`
-                    *,
-                    provider:service_providers(id, trade_name, responsible_name, profile_image)
-                `)
+                .select('*, provider:service_providers(id, trade_name, responsible_name, profile_image)')
                 .eq('client_id', userId)
-                .order('updated_at', { ascending: false })
-
+                .order('last_message_at', { ascending: false })
             if (error) throw error
-            setChats(data)
+            setChats(data || [])
             setLoading(false)
-        } catch (err) {
-            console.error('Error loading chats:', err)
-            setLoading(false)
-        }
+        } catch (err) { console.error('Error loading chats:', err); setLoading(false) }
     }
 
     async function loadMessages(chatId) {
-        const { data } = await supabase
-            .from('chat_messages')
-            .select('*')
-            .eq('conversation_id', chatId)
-            .order('created_at', { ascending: true })
-
+        const { data } = await supabase.from('chat_messages').select('*').eq('conversation_id', chatId).order('created_at', { ascending: true })
         setMessages(data || [])
         scrollToBottom()
-
-        if (selectedChat) {
-            checkActiveBooking(selectedChat.provider.id)
-            loadActiveQuote(chatId)
-        }
+        if (selectedChat) { checkActiveBooking(selectedChat.provider?.id); loadActiveQuote(chatId) }
     }
 
     async function loadActiveQuote(chatId) {
-        const { data } = await supabase
-            .from('service_quotes')
-            .select('*')
-            .eq('conversation_id', chatId)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-
+        const { data } = await supabase.from('service_quotes').select('*').eq('conversation_id', chatId).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).single()
         setActiveQuote(data)
     }
 
     async function checkActiveBooking(providerId) {
-        const { data } = await supabase
-            .from('service_bookings')
-            .select('*')
-            .eq('client_id', user.id)
-            .eq('provider_id', providerId)
-            .in('status', ['confirmed', 'in_progress', 'waiting_client_confirmation', 'completed'])
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-
+        if (!providerId) return
+        const { data } = await supabase.from('service_bookings').select('*').eq('client_id', user.id).eq('provider_id', providerId).in('status', ['confirmed', 'in_progress', 'waiting_client_confirmation', 'completed']).order('created_at', { ascending: false }).limit(1).single()
         setActiveBooking(data)
     }
 
     async function confirmCompletion() {
         if (!activeBooking) return
         try {
-            const { error } = await supabase
-                .from('service_bookings')
-                .update({
-                    status: 'completed',
-                    updated_at: new Date().toISOString(),
-                    completed_at: new Date().toISOString()
-                })
-                .eq('id', activeBooking.id)
-
-            if (error) throw error
-
-            await supabase
-                .from('service_providers')
-                .update({ is_busy: false })
-                .eq('id', activeBooking.provider_id)
-
+            await supabase.from('service_bookings').update({ status: 'completed', updated_at: new Date().toISOString(), completed_at: new Date().toISOString() }).eq('id', activeBooking.id)
+            await supabase.from('service_providers').update({ is_busy: false }).eq('id', activeBooking.provider_id)
             checkActiveBooking(activeBooking.provider_id)
-            setShowReviewModal(true) // Open review modal
-        } catch (err) {
-            console.error(err)
-            alert('Erro ao confirmar serviço.')
-        }
+            setShowReviewModal(true)
+        } catch (err) { console.error(err); alert('Erro ao confirmar servico.') }
     }
 
     async function submitReview() {
         if (!activeBooking) return
         setSubmittingReview(true)
         try {
-            // 1. Update Booking with rating/review
-            const { error: bookingError } = await supabase
-                .from('service_bookings')
-                .update({
-                    rating: reviewRating,
-                    review: reviewText,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', activeBooking.id)
-
-            if (bookingError) throw bookingError
-
-            // 2. Fetch current provider stats
-            const { data: provider } = await supabase
-                .from('service_providers')
-                .select('rating, total_reviews')
-                .eq('id', activeBooking.provider_id)
-                .single()
-
+            await supabase.from('service_bookings').update({ rating: reviewRating, review: reviewText, updated_at: new Date().toISOString() }).eq('id', activeBooking.id)
+            const { data: provider } = await supabase.from('service_providers').select('rating, total_reviews').eq('id', activeBooking.provider_id).single()
             if (provider) {
                 const newTotalReviews = (provider.total_reviews || 0) + 1
                 const newRating = ((provider.rating * provider.total_reviews) + reviewRating) / newTotalReviews
-
-                // 3. Update Provider stats
-                await supabase
-                    .from('service_providers')
-                    .update({
-                        rating: newRating,
-                        total_reviews: newTotalReviews,
-                        total_services: (provider.total_services || 0) + 1 // Assuming 1 service = 1 completed booking
-                    })
-                    .eq('id', activeBooking.provider_id)
+                await supabase.from('service_providers').update({ rating: newRating, total_reviews: newTotalReviews, total_services: (provider.total_services || 0) + 1 }).eq('id', activeBooking.provider_id)
             }
-
-            alert('Avaliação enviada com sucesso! Obrigado.')
+            alert('Avaliacao enviada! Obrigado.')
             setShowReviewModal(false)
             checkActiveBooking(activeBooking.provider_id)
-        } catch (err) {
-            console.error(err)
-            alert('Erro ao enviar avaliação.')
-        } finally {
-            setSubmittingReview(false)
-        }
+        } catch (err) { console.error(err); alert('Erro ao enviar avaliacao.') }
+        finally { setSubmittingReview(false) }
     }
 
-    function scrollToBottom() {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
+    function scrollToBottom() { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }
 
     async function sendMessage() {
         if (!newMessage.trim() || !selectedChat) return
-
         try {
+            const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
             await supabase.from('chat_messages').insert({
                 conversation_id: selectedChat.id,
                 sender_id: user.id,
+                sender_name: profile?.full_name || 'Cliente',
+                sender_type: 'client',
                 message: newMessage.trim()
             })
+            await supabase.from('chat_conversations').update({ last_message: newMessage.trim(), last_message_at: new Date().toISOString() }).eq('id', selectedChat.id)
             setNewMessage('')
             loadMessages(selectedChat.id)
-        } catch (err) {
-            console.error('Error sending message:', err)
-        }
+        } catch (err) { console.error('Error sending message:', err) }
     }
 
     function handleHire() {
         if (!selectedChat) return
-
-        // Se houver um orçamento ativo, usa o valor dele. Caso contrário (fallback), usa o padrão.
         const amount = activeQuote ? activeQuote.amount : 200.00
         const quoteId = activeQuote ? activeQuote.id : ''
-
-        navigate(`/pagamento?quote_id=${selectedChat.quote_request_id || ''}&provider_id=${selectedChat.provider.id}&chat_id=${selectedChat.id}&amount=${amount}&service_quote_id=${quoteId}`)
+        navigate(`/pagamento?quote_id=${selectedChat.quote_request_id || ''}&provider_id=${selectedChat.provider?.id}&chat_id=${selectedChat.id}&amount=${amount}&service_quote_id=${quoteId}`)
     }
 
     if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-green animate-spin" />
-            </div>
-        )
+        return (<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-green animate-spin" /></div>)
     }
 
     return (
         <LocalErrorBoundary>
             <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Orçamentos Pendentes (Recuperação) */}
-            {pendingQuotes.length > 0 && (
-                <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between overflow-x-auto gap-4">
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
-                        <span className="text-amber-900 font-bold text-sm">Você tem {pendingQuotes.length} orçamento(s) aguardando pagamento:</span>
-                    </div>
-                    <div className="flex gap-3">
-                        {pendingQuotes.map(quote => (
-                            <div 
-                                key={quote.id}
-                                onClick={() => {
-                                    const chat = chats.find(c => c.id === quote.conversation_id)
-                                    if(chat) setSelectedChat(chat)
-                                }}
-                                className="bg-white px-4 py-2 rounded-xl shadow-sm border border-amber-200 flex items-center gap-3 cursor-pointer hover:scale-105 transition-all flex-shrink-0"
-                            >
-                                <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden">
-                                     <img src={quote.provider?.profile_image} className="w-full h-full object-cover" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-gray-500 font-bold leading-none">{quote.provider?.trade_name || 'Profissional'}</p>
-                                    <p className="text-sm font-bold text-green">R$ {quote.amount.toFixed(2)}</p>
-                                </div>
-                                <ArrowRight className="w-4 h-4 text-amber-500" />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-3">
-                    <User className="w-8 h-8 text-gray-400 bg-gray-100 rounded-full p-1.5" />
-                    <div>
-                        <h1 className="text-lg font-bold text-gray-800">Minhas Solicitações</h1>
-                        <p className="text-xs text-gray-500">Logado como client</p>
-                    </div>
-                </div>
-                <Link to="/profissionais" className="text-green text-sm font-semibold hover:underline">
-                    Nova Solicitação
-                </Link>
-            </div>
-
-            <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-80px)]">
-
-                {/* Chat List */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                    <div className="p-4 border-b border-gray-100 bg-gray-50">
-                        <h2 className="font-bold text-gray-700">Conversas</h2>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                        {chats.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400">
-                                <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                                <p>Nenhuma conversa iniciada.</p>
-                            </div>
-                        ) : (
-                            chats.map(chat => (
-                                <div
-                                    key={chat.id}
-                                    onClick={() => setSelectedChat(chat)}
-                                    className={`p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedChat?.id === chat.id ? 'bg-green/5 border-l-4 border-l-green' : ''}`}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-bold text-gray-900 line-clamp-1">
-                                            {chat.provider?.trade_name || chat.provider?.responsible_name || 'Profissional'}
-                                        </h3>
-                                        <span className="text-xs text-gray-400">
-                                            {new Date(chat.updated_at).toLocaleDateString()}
-                                        </span>
+                {pendingQuotes.length > 0 && (
+                    <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between overflow-x-auto gap-4">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
+                            <span className="text-amber-900 font-bold text-sm">Voce tem {pendingQuotes.length} orcamento(s) aguardando pagamento:</span>
+                        </div>
+                        <div className="flex gap-3">
+                            {pendingQuotes.map(quote => (
+                                <div key={quote.id} onClick={() => { const chat = chats.find(c => c.id === quote.conversation_id); if (chat) setSelectedChat(chat) }}
+                                    className="bg-white px-4 py-2 rounded-xl shadow-sm border border-amber-200 flex items-center gap-3 cursor-pointer hover:scale-105 transition-all flex-shrink-0">
+                                    <div>
+                                        <p className="text-[10px] text-gray-500 font-bold leading-none">{quote.provider?.trade_name || 'Profissional'}</p>
+                                        <p className="text-sm font-bold text-green">R$ {Number(quote.amount).toFixed(2)}</p>
                                     </div>
-                                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <span className={`px-2 py-0.5 rounded-full ${chat.status === 'active' ? 'bg-green/10 text-green' : 'bg-gray-100 text-gray-500'}`}>
-                                            {chat.status === 'active' ? 'Ativo' : chat.status === 'closed' ? 'Fechado' : 'Contratado'}
-                                        </span>
-                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-amber-500" />
                                 </div>
-                            ))
-                        )}
+                            ))}
+                        </div>
                     </div>
+                )}
+                <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center">
+                            <User className="w-5 h-5 text-green" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg font-bold text-gray-800">Ola, {profileName || 'Cliente'}!</h1>
+                            <p className="text-xs text-gray-500">Suas conversas e solicitacoes</p>
+                        </div>
+                    </div>
+                    <Link to="/profissionais" className="bg-green text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-dark transition-colors">
+                        <Plus className="w-4 h-4" />
+                        Nova Solicitacao
+                    </Link>
                 </div>
-
-                {/* Chat Area */}
-                <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
-                    {selectedChat ? (
-                        <>
-                            {/* Chat Header */}
-                            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                                        {selectedChat.provider?.profile_image ? (
-                                            <img src={selectedChat.provider.profile_image} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <User className="w-5 h-5 text-gray-400" />
-                                        )}
+                <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-80px)]">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-100 bg-gray-50">
+                            <h2 className="font-bold text-gray-700">Minhas Conversas</h2>
+                            <p className="text-xs text-gray-400 mt-0.5">{chats.length} conversa(s)</p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                            {chats.length === 0 ? (
+                                <div className="p-8 text-center flex flex-col items-center gap-4">
+                                    <MessageCircle className="w-16 h-16 text-gray-200" />
+                                    <div>
+                                        <p className="font-bold text-gray-600 mb-1">Nenhuma conversa ainda</p>
+                                        <p className="text-sm text-gray-400 mb-4">Solicite um orcamento para comecar</p>
+                                    </div>
+                                    <Link to="/profissionais" className="bg-green text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-green-dark transition-colors flex items-center gap-2">
+                                        <Plus className="w-4 h-4" />
+                                        Solicitar Orcamento
+                                    </Link>
+                                </div>
+                            ) : (
+                                chats.map(chat => (
+                                    <div key={chat.id} onClick={() => setSelectedChat(chat)}
+                                        className={`p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedChat?.id === chat.id ? 'bg-green/5 border-l-4 border-l-green' : ''}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                                {chat.provider?.profile_image ? (
+                                                    <img src={chat.provider.profile_image} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="font-bold text-green text-sm">{(chat.provider?.trade_name || chat.provider_name || 'P').charAt(0).toUpperCase()}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <h3 className="font-bold text-gray-900 text-sm truncate">
+                                                        {chat.provider?.trade_name || chat.provider?.responsible_name || chat.provider_name || 'Profissional'}
+                                                    </h3>
+                                                    <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                                                        {chat.last_message_at ? new Date(chat.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 truncate mt-0.5">{chat.last_message || 'Orcamento solicitado'}</p>
+                                                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${chat.status === 'active' ? 'bg-green/10 text-green' : 'bg-gray-100 text-gray-500'}`}>
+                                                    {chat.status === 'active' ? 'Ativo' : 'Encerrado'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                    <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+                        {selectedChat ? (
+                            <>
+                                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                                            {selectedChat.provider?.profile_image ? (
+                                                <img src={selectedChat.provider.profile_image} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="font-bold text-green">{(selectedChat.provider?.trade_name || selectedChat.provider_name || 'P').charAt(0).toUpperCase()}</span>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h2 className="font-bold text-gray-800">{selectedChat.provider?.trade_name || selectedChat.provider?.responsible_name || selectedChat.provider_name || 'Profissional'}</h2>
+                                            <p className="text-xs text-green flex items-center gap-1"><span className="w-2 h-2 bg-green rounded-full animate-pulse"></span>Online agora</p>
+                                        </div>
                                     </div>
                                     <div>
-                                        <h2 className="font-bold text-gray-800">
-                                            {selectedChat.provider?.trade_name || 'Profissional'}
-                                        </h2>
-                                        <p className="text-xs text-green flex items-center gap-1">
-                                            <span className="w-2 h-2 bg-green rounded-full animate-pulse"></span>
-                                            Online agora
-                                        </p>
-                                    </div>
-                                </div>
-                                <div>
-                                    {selectedChat.status === 'active' && !activeBooking && (
-                                        <div className="flex items-center gap-3">
-                                            {activeQuote ? (
+                                        {selectedChat.status === 'active' && !activeBooking && (
+                                            activeQuote ? (
                                                 <div className="flex items-center gap-2 bg-green/10 px-4 py-2 rounded-xl border border-green/20">
                                                     <div className="text-left">
-                                                        <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orçamento</p>
-                                                        <p className="text-green font-bold text-sm">R$ {activeQuote.amount.toFixed(2)}</p>
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orcamento</p>
+                                                        <p className="text-green font-bold text-sm">R$ {Number(activeQuote.amount).toFixed(2)}</p>
                                                     </div>
-                                                    <button
-                                                        onClick={handleHire}
-                                                        className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2"
-                                                    >
-                                                        <CreditCard className="w-3.5 h-3.5" />
-                                                        Pagar
+                                                    <button onClick={handleHire} className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2">
+                                                        <CreditCard className="w-3.5 h-3.5" />Pagar
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <button
-                                                    onClick={handleHire}
-                                                    className="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
-                                                >
-                                                    <CheckCircle2 className="w-4 h-4" />
-                                                    Contratar (R$ 200)
+                                                <button onClick={handleHire} className="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2">
+                                                    <CheckCircle2 className="w-4 h-4" />Contratar
                                                 </button>
-                                            )}
-                                        </div>
-                                    )}
-                                    {activeBooking?.status === 'waiting_client_confirmation' && (
-                                        <button
-                                            onClick={confirmCompletion}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2 animate-pulse"
-                                        >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                            Confirmar Conclusão
-                                        </button>
-                                    )}
-                                    {activeBooking?.status === 'confirmed' && (
-                                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold">
-                                            Agendado
-                                        </span>
-                                    )}
-                                    {activeBooking?.status === 'in_progress' && (
-                                        <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                                            <Clock className="w-3 h-3" />
-                                            Em Execução
-                                        </span>
-                                    )}
-                                    {activeBooking?.status === 'completed' && (
-                                        <span className="bg-green/10 text-green px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                                            <CheckCircle2 className="w-3 h-3" />
-                                            Serviço Finalizado
-                                        </span>
-                                    )}
+                                            )
+                                        )}
+                                        {activeBooking?.status === 'waiting_client_confirmation' && (
+                                            <button onClick={confirmCompletion} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2 animate-pulse">
+                                                <CheckCircle2 className="w-4 h-4" />Confirmar Conclusao
+                                            </button>
+                                        )}
+                                        {activeBooking?.status === 'confirmed' && (<span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold">Agendado</span>)}
+                                        {activeBooking?.status === 'in_progress' && (<span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><Clock className="w-3 h-3" />Em Execucao</span>)}
+                                        {activeBooking?.status === 'completed' && (<span className="bg-green/10 text-green px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Servico Finalizado</span>)}
+                                    </div>
                                 </div>
-                            </div>
-
-                            {/* Messages */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
-                                {messages.map(msg => {
-                                    const isMe = msg.sender_id === user.id
-                                    return (
-                                        <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[80%] rounded-2xl p-3.5 shadow-sm ${isMe
-                                                ? 'bg-green text-white rounded-tr-none'
-                                                : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
-                                                }`}>
-                                                <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                                                <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
-                                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+                                    {messages.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+                                            <MessageCircle className="w-12 h-12 opacity-20" />
+                                            <p className="text-sm">Nenhuma mensagem ainda. Comece a conversa!</p>
+                                        </div>
+                                    ) : messages.map(msg => {
+                                        const isMe = msg.sender_id === user.id
+                                        return (
+                                            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                <div className={`max-w-[80%] rounded-2xl p-3.5 shadow-sm ${isMe ? 'bg-green text-white rounded-tr-none' : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'}`}>
+                                                    {!isMe && msg.sender_name && (<p className="text-[10px] font-bold text-green mb-1">{msg.sender_name}</p>)}
+                                                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                                                    <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
+                                                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )
-                                })}
-                                <div ref={messagesEndRef} />
-                            </div>
-
-                            {/* Input */}
-                            <div className="p-4 border-t border-gray-100 bg-white">
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newMessage}
-                                        onChange={(e) => setNewMessage(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                                        disabled={selectedChat.status !== 'active'}
-                                        placeholder={selectedChat.status === 'active' ? "Digite sua mensagem..." : "Esta conversa foi encerrada."}
-                                        className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green disabled:opacity-50"
-                                    />
-                                    <button
-                                        onClick={sendMessage}
-                                        disabled={!newMessage.trim() || selectedChat.status !== 'active'}
-                                        className="p-3 bg-green text-white rounded-xl hover:bg-green-dark disabled:opacity-50 disabled:bg-gray-300 transition-colors"
-                                    >
-                                        <Send className="w-5 h-5" />
-                                    </button>
+                                        )
+                                    })}
+                                    <div ref={messagesEndRef} />
+                                </div>
+                                <div className="p-4 border-t border-gray-100 bg-white">
+                                    <div className="flex gap-2">
+                                        <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                                            disabled={selectedChat.status !== 'active'} placeholder={selectedChat.status === 'active' ? "Digite sua mensagem..." : "Esta conversa foi encerrada."}
+                                            className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green disabled:opacity-50" />
+                                        <button onClick={sendMessage} disabled={!newMessage.trim() || selectedChat.status !== 'active'}
+                                            className="p-3 bg-green text-white rounded-xl hover:bg-green-dark disabled:opacity-50 disabled:bg-gray-300 transition-colors">
+                                            <Send className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 gap-4">
+                                <MessageCircle className="w-16 h-16 opacity-20" />
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-gray-600 mb-1">Selecione uma conversa</p>
+                                    <p className="text-sm text-gray-400">Escolha um prestador ao lado para ver as mensagens</p>
                                 </div>
                             </div>
-                        </>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8">
-                            <MessageCircle className="w-16 h-16 mb-4 opacity-20" />
-                            <p className="text-lg font-medium">Selecione uma conversa ao lado</p>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
+                {showReviewModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                                </div>
+                                <h2 className="text-xl font-bold text-gray-900">Avalie o Servico</h2>
+                                <p className="text-sm text-gray-500">Sua opiniao e muito importante.</p>
+                            </div>
+                            <div className="space-y-6">
+                                <div className="flex justify-center gap-2">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button key={star} onClick={() => setReviewRating(star)} className="focus:outline-none transform transition-transform hover:scale-110">
+                                            <Star className={`w-10 h-10 ${star <= reviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`} />
+                                        </button>
+                                    ))}
+                                </div>
+                                <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} rows={3} placeholder="Como foi sua experiencia?" className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green resize-none" />
+                                <button onClick={submitReview} disabled={submittingReview} className="w-full bg-green hover:bg-green-dark text-white py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
+                                    {submittingReview ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enviar Avaliacao'}
+                                </button>
+                                <button onClick={() => setShowReviewModal(false)} className="w-full text-gray-400 text-sm font-medium hover:text-gray-600">Pular agora</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {showWelcome && (
+                    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl">
+                            <div className="bg-navy p-8 text-center relative">
+                                <button onClick={() => setShowWelcome(false)} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                                <div className="w-20 h-20 bg-green/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-green/30">
+                                    <Shield className="w-10 h-10 text-green" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-white">Bem-vindo a LimpFlix!</h2>
+                                <p className="text-green font-medium">Sua seguranca e nossa prioridade</p>
+                            </div>
+                            <div className="p-8">
+                                <div className="space-y-4 text-gray-600 leading-relaxed text-sm">
+                                    <p>Para sua protecao, realize todos os pagamentos exclusivamente atraves da nossa plataforma.</p>
+                                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">
+                                        <p className="text-blue-900 font-medium">Por que pagar pelo LimpFlix?</p>
+                                        <p className="text-blue-800 text-xs mt-1">Isso assegura que voce receba o estorno caso o profissional nao realize o trabalho.</p>
+                                    </div>
+                                    <p className="text-xs border-t border-gray-100 pt-4 text-gray-400"><span className="font-bold text-red-500 uppercase">Atencao:</span> Pagamentos diretos com prestadores resultam na perda de garantias.</p>
+                                </div>
+                                <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-green hover:bg-green-dark text-white py-4 rounded-2xl font-bold transition-all shadow-lg">Entendi e Aceito</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-            {/* Review Modal */}
-            {showReviewModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-fade-in">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
-                            </div>
-                            <h2 className="text-xl font-bold text-gray-900">Avalie o Serviço</h2>
-                            <p className="text-sm text-gray-500">Sua opinião é muito importante para nós e para o profissional.</p>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="flex justify-center gap-2">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                    <button
-                                        key={star}
-                                        onClick={() => setReviewRating(star)}
-                                        className="focus:outline-none transform transition-transform hover:scale-110"
-                                    >
-                                        <Star
-                                            className={`w-10 h-10 ${star <= reviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`}
-                                        />
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Seu comentário (opcional)</label>
-                                <textarea
-                                    value={reviewText}
-                                    onChange={(e) => setReviewText(e.target.value)}
-                                    rows={3}
-                                    placeholder="Como foi sua experiência?"
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green resize-none"
-                                />
-                            </div>
-
-                            <button
-                                onClick={submitReview}
-                                disabled={submittingReview}
-                                className="w-full bg-green hover:bg-green-dark text-white py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                                {submittingReview ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enviar Avaliação'}
-                            </button>
-                            <button
-                                onClick={() => setShowReviewModal(false)}
-                                className="w-full text-gray-400 text-sm font-medium hover:text-gray-600"
-                            >
-                                Pular agora
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Welcome & Safety Modal */}
-            {showWelcome && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-slide-up">
-                        {/* Header Image/Icon */}
-                        <div className="bg-navy p-8 text-center relative">
-                            <button 
-                                onClick={() => setShowWelcome(false)}
-                                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-                            <div className="w-20 h-20 bg-green/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-green/30">
-                                <Shield className="w-10 h-10 text-green" />
-                            </div>
-                            <h2 className="text-2xl font-bold text-white">Bem-vindo à LimpFlix! 🎉</h2>
-                            <p className="text-green font-medium">Sua segurança é nossa prioridade</p>
-                        </div>
-
-                        <div className="p-8">
-                            <div className="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
-                                <p>
-                                    Para sua proteção e garantia de serviço, realize todos os seus pagamentos **exclusivamente através da nossa plataforma**.
-                                </p>
-                                
-                                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">
-                                    <p className="text-blue-900 font-medium"> Por que pagar pelo LimpFlix?</p>
-                                    <p className="text-blue-800 text-xs mt-1">
-                                        Isso assegura que você receba o estorno integral caso o profissional não realize o trabalho conforme o combinado.
-                                    </p>
-                                </div>
-
-                                <p className="text-xs border-t border-gray-100 pt-4 text-gray-400">
-                                    <span className="font-bold text-red-500 uppercase">Atenção:</span> O alinhamento de pagamentos diretos com prestadores é estritamente proibido e resulta na perda de todas as garantias e na possível exclusão da conta. Em caso de negociações externas, a LimpFlix isenta-se de qualquer responsabilidade.
-                                </p>
-                            </div>
-
-                            <button
-                                onClick={() => setShowWelcome(false)}
-                                className="w-full mt-8 bg-green hover:bg-green-dark text-white py-4 rounded-2xl font-bold transition-all shadow-lg shadow-green/25 hover:scale-[1.02] active:scale-[0.98]"
-                            >
-                                Entendi e Aceito
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
         </LocalErrorBoundary>
     )
 }
