@@ -254,6 +254,10 @@ export default function ClientDashboard() {
                                                 <p className="text-xs text-gray-500 truncate mt-0.5">{chat.last_message || 'Orcamento solicitado'}</p>
                                                 <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${chat.status === 'active' ? 'bg-green/10 text-green' : 'bg-gray-100 text-gray-500'}`}>
                                                     {chat.status === 'active' ? 'Ativo' : 'Encerrado'}
+<button onClick={(e) => { e.stopPropagation(); deleteChat(chat.id) }} className="text-red-400 hover:text-red-600 p-1">
+  <Trash2 className="w-3 h-3" />
+</button>
+
                                                 </span>
                                             </div>
                                         </div>
@@ -408,6 +412,8 @@ export default function ClientDashboard() {
         </LocalErrorBoundary>
     )
 }
+
+
 
 
 
