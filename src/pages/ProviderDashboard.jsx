@@ -135,6 +135,7 @@ export default function ProviderDashboard() {
                 }
             )
             .subscribe()
+.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_conversations' }, () => { playNotificationSound(); if ('Notification' in window && Notification.permission === 'granted') { new Notification('LimpFlix', { body: 'Novo pedido de orcamento!', icon: '/icon-192.png' }) } })
 
         return () => {
             supabase.removeChannel(channel)
