@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -159,7 +159,7 @@ export default function ClientQuotes() {
                                                         <XCircle className="w-3 h-3" />
                                                         Recusar
                                                     </button>
-                                                    <button onClick={() => approveQuote(quote.id, quote.conversation_id)}
+                                                    <button onClick={() => approveQuote(quote)}
                                                         className="flex items-center gap-1 px-3 py-2 bg-green text-white hover:bg-green-dark rounded-xl text-xs font-bold transition-colors">
                                                         <CheckCircle2 className="w-3 h-3" />
                                                         Aprovar
@@ -177,3 +177,5 @@ export default function ClientQuotes() {
         </div>
     )
 }
+
+
