@@ -40,6 +40,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                 },
                 (payload) => {
                     setMessages((prev) => [...prev, payload.new])
+                    setTimeout(() => scrollToBottom(), 100)
                 }
             )
             .subscribe()
@@ -149,6 +150,8 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
             await supabase.from('chat_messages').insert({
                 conversation_id: conversationId,
                 sender_id: user.id,
+                sender_name: isProvider ? (providerData?.trade_name || 'Prestador') : 'Cliente',
+                sender_type: isProvider ? 'provider' : 'client',
                 message: message
             })
 
@@ -185,6 +188,8 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                 .insert({
                     conversation_id: conversationId,
                     sender_id: user.id,
+                    sender_name: isProvider ? (providerData?.trade_name || 'Prestador') : 'Cliente',
+                    sender_type: isProvider ? 'provider' : 'client',
                     message: newMessage.trim()
                 })
 
@@ -375,7 +380,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                                     placeholder="Ex: 150.00"
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-navy text-lg font-bold"
                                 />
-                                <p className="text-[10px] text-gray-400 mt-1">* Taxa de 5% da plataforma + 1% de indicação serão descontados do valor líquido.</p>
+                                <p className="text-[10px] text-gray-400 mt-1">* Taxa de 8% da plataforma + 2% de indicação serão descontados do valor líquido.</p>
                             </div>
 
                             <div>
@@ -408,3 +413,6 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
         </div>
     )
 }
+
+
+
