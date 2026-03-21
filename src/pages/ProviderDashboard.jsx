@@ -8,9 +8,10 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield
+    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield, FileText
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
+import ProviderQuotesTab from '../components/ProviderQuotesTab'
 import ChatWindow from '../components/ChatWindow'
 import { sendPayoutPix } from '../lib/payouts'
 
@@ -508,6 +509,7 @@ export default function ProviderDashboard() {
         { id: 'referrals', label: 'Indicações', icon: Users },
         { id: 'messages', label: 'Mensagens', icon: MessageSquare },
         { id: 'settings', label: 'Configurações', icon: Settings },
+        { id: 'quotes', label: 'Orcamentos', icon: FileText },
         { id: 'verification', label: 'Verificações', icon: Shield },
     ]
 
@@ -1001,6 +1003,9 @@ export default function ProviderDashboard() {
                 )}
 
                 {/* Settings Tab */}
+                {activeTab === 'quotes' && (
+                    <ProviderQuotesTab providerId={provider?.id} />
+                )}
                 {activeTab === 'settings' && (
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-fade-in">
                         <div className="flex items-center justify-between mb-6">
@@ -1260,4 +1265,8 @@ export default function ProviderDashboard() {
         </LocalErrorBoundary>
     )
 }
+
+
+
+
 
