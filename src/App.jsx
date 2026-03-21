@@ -16,6 +16,7 @@ import PaymentSuccess from './pages/PaymentSuccess'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminLogin from './pages/AdminLogin'
 import Terms from './pages/Terms'
+import ClientQuotes from './pages/ClientQuotes'
 import Privacy from './pages/Privacy'
 import InstallPrompt from './components/InstallPrompt'
 import { useEffect, useState } from 'react'
@@ -98,6 +99,7 @@ function App() {
                     <Route path="/pagamento" element={<PaymentPage />} />
                     <Route path="/pagamento/sucesso" element={<PaymentSuccess />} />
                     <Route path="/cliente/dashboard" element={<ClientDashboard />} />
+                    <Route path="/cliente/orcamentos" element={<ClientQuotes />} />
                     <Route path="/dashboard" element={<ProviderDashboard />} />
                     <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="/admin" element={
@@ -125,3 +127,5 @@ function App() {
 }
 
 export default App
+
+
