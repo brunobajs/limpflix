@@ -281,7 +281,7 @@ export default function RequestQuote() {
                                 className="absolute inset-0 opacity-0 cursor-pointer"
                             />
                             <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                            <p className="text-sm text-gray-500">Toque para adicionar mídia</p>
+                            <p className="text-sm text-gray-500">Fotos para Orçamento</p>
                         </div>
 
                         {/* Previews */}

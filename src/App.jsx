@@ -95,18 +95,26 @@ function App() {
                     {/* Full-screen pages (no Header/Footer) */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/cadastro-profissional" element={<ProviderRegister />} />
-                    <Route path="/solicitar-orcamento" element={<Layout><RequestQuote /></Layout>} />
+                    
+                    {/* Routes with spelling fixes */}
+                    <Route path="/solicitar-orçamento" element={<Layout><RequestQuote /></Layout>} />
+                    <Route path="/solicitar-orcamento" element={<Navigate to="/solicitar-orçamento" replace />} />
+                    
+                    <Route path="/cliente/orçamentos" element={<Layout><ClientQuotes /></Layout>} />
+                    <Route path="/cliente/orcamentos" element={<Navigate to="/cliente/orçamentos" replace />} />
+                    
                     <Route path="/pagamento" element={<PaymentPage />} />
                     <Route path="/pagamento/sucesso" element={<PaymentSuccess />} />
                     <Route path="/cliente/dashboard" element={<ClientDashboard />} />
-                    <Route path="/cliente/orcamentos" element={<ClientQuotes />} />
                     <Route path="/dashboard" element={<ProviderDashboard />} />
+                    
                     <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="/admin" element={
                         <AdminRoute>
                             <AdminDashboard />
                         </AdminRoute>
                     } />
+                    
                     <Route path="/termos" element={<Layout><Terms /></Layout>} />
                     <Route path="/privacidade" element={<Layout><Privacy /></Layout>} />
 
@@ -127,5 +135,3 @@ function App() {
 }
 
 export default App
-
-

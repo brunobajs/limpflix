@@ -32,14 +32,14 @@ export default function ClientQuotes() {
     }
 
     async function approveQuote(quoteId, conversationId) {
-        if (!window.confirm('Deseja aprovar este orcamento?')) return
+        if (!window.confirm('Deseja aprovar este orçamento?')) return
         await supabase.from('service_quotes').update({ status: 'accepted', updated_at: new Date().toISOString() }).eq('id', quoteId)
         setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: 'accepted' } : q))
         if (conversationId) navigate(`/cliente/dashboard`)
     }
 
     async function rejectQuote(quoteId) {
-        if (!window.confirm('Deseja recusar este orcamento?')) return
+        if (!window.confirm('Deseja recusar este orçamento?')) return
         await supabase.from('service_quotes').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', quoteId)
         setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: 'rejected' } : q))
     }
@@ -67,7 +67,7 @@ export default function ClientQuotes() {
                     <ArrowLeft className="w-5 h-5" />
                     Voltar
                 </button>
-                <h1 className="text-lg font-bold text-gray-800">Meus Orcamentos</h1>
+                <h1 className="text-lg font-bold text-gray-800">Meus Orçamentos</h1>
             </div>
 
             <div className="max-w-4xl mx-auto p-6">
@@ -105,9 +105,9 @@ export default function ClientQuotes() {
                 {filtered.length === 0 ? (
                     <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
                         <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                        <p className="font-bold text-gray-500">Nenhum orcamento encontrado</p>
+                        <p className="font-bold text-gray-500">Nenhum orçamento encontrado</p>
                         <button onClick={() => navigate('/profissionais')} className="mt-4 bg-green text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-green-dark transition-colors">
-                            Solicitar Orcamento
+                            Solicitar Orçamento
                         </button>
                     </div>
                 ) : (

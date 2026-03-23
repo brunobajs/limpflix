@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
 import { Loader2, FileText, CheckCircle2, XCircle, Clock, DollarSign } from "lucide-react"
 
@@ -70,7 +70,7 @@ export default function ProviderQuotesTab({ providerId }) {
             {filtered.length === 0 ? (
                 <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
                     <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                    <p className="font-bold text-gray-500">Nenhum orcamento encontrado</p>
+                    <p className="font-bold text-gray-500">Nenhum orçamento encontrado</p>
                 </div>
             ) : (
                 <div className="space-y-4">

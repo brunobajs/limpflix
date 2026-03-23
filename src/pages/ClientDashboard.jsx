@@ -77,6 +77,40 @@ export default function ClientDashboard() {
         setPendingQuotes(data || [])
     }
 
+    function playNotificationSound() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+            const osc = audioCtx.createOscillator()
+            const gain = audioCtx.createGain()
+            osc.type = 'sine'
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime)
+            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5)
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime)
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5)
+            osc.connect(gain)
+            gain.connect(audioCtx.destination)
+            osc.start()
+            osc.stop(audioCtx.currentTime + 0.5)
+        } catch (e) { console.error('Audio alert failed:', e) }
+    }
+
+    useEffect(() => {
+        if (!user?.id) return
+        const channel = supabase
+            .channel(`client-notifs-${user.id}`)
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'chat_messages'
+            }, (payload) => {
+                if (payload.new.sender_id !== user.id) {
+                    playNotificationSound()
+                }
+            })
+            .subscribe()
+        return () => supabase.removeChannel(channel)
+    }, [user?.id])
+
     async function loadChats(userId) {
         try {
             const { data, error } = await supabase
@@ -115,7 +149,7 @@ export default function ClientDashboard() {
             await supabase.from('service_providers').update({ is_busy: false }).eq('id', activeBooking.provider_id)
             checkActiveBooking(activeBooking.provider_id)
             setShowReviewModal(true)
-        } catch (err) { console.error(err); alert('Erro ao confirmar servico.') }
+        } catch (err) { console.error(err); alert('Erro ao confirmar serviço.') }
     }
 
     async function submitReview() {
@@ -129,10 +163,10 @@ export default function ClientDashboard() {
                 const newRating = ((provider.rating * provider.total_reviews) + reviewRating) / newTotalReviews
                 await supabase.from('service_providers').update({ rating: newRating, total_reviews: newTotalReviews, total_services: (provider.total_services || 0) + 1 }).eq('id', activeBooking.provider_id)
             }
-            alert('Avaliacao enviada! Obrigado.')
+            alert('Avaliação enviada! Obrigado.')
             setShowReviewModal(false)
             checkActiveBooking(activeBooking.provider_id)
-        } catch (err) { console.error(err); alert('Erro ao enviar avaliacao.') }
+        } catch (err) { console.error(err); alert('Erro ao enviar avaliação.') }
         finally { setSubmittingReview(false) }
     }
 
@@ -180,7 +214,7 @@ export default function ClientDashboard() {
                     <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between overflow-x-auto gap-4">
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
-                            <span className="text-amber-900 font-bold text-sm">Voce tem {pendingQuotes.length} orcamento(s) aguardando pagamento:</span>
+                            <span className="text-amber-900 font-bold text-sm">Você tem {pendingQuotes.length} orçamento(s) aguardando pagamento:</span>
                         </div>
                         <div className="flex gap-3">
                             {pendingQuotes.map(quote => (
@@ -206,7 +240,7 @@ export default function ClientDashboard() {
                             <p className="text-xs text-gray-500">Suas conversas e solicitacoes</p>
                         </div>
                     </div>
-                    <Link to="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 font-medium text-sm mr-2"><ArrowLeft className="w-4 h-4" />Inicio</Link><Link to="/cliente/orcamentos" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 font-medium text-sm mr-2 border border-gray-200 px-3 py-2 rounded-xl"><FileText className="w-4 h-4" />Orcamentos</Link><Link to="/profissionais" className="bg-green text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-dark transition-colors">
+                    <Link to="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 font-medium text-sm mr-2"><ArrowLeft className="w-4 h-4" />Início</Link><Link to="/cliente/orcamentos" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 font-medium text-sm mr-2 border border-gray-200 px-3 py-2 rounded-xl"><FileText className="w-4 h-4" />Orçamentos</Link><Link to="/profissionais" className="bg-green text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-dark transition-colors">
                         <Plus className="w-4 h-4" />
                         Nova Solicitacao
                     </Link>
@@ -223,11 +257,11 @@ export default function ClientDashboard() {
                                     <MessageCircle className="w-16 h-16 text-gray-200" />
                                     <div>
                                         <p className="font-bold text-gray-600 mb-1">Nenhuma conversa ainda</p>
-                                        <p className="text-sm text-gray-400 mb-4">Solicite um orcamento para comecar</p>
+                                        <p className="text-sm text-gray-400 mb-4">Solicite um orçamento para começar</p>
                                     </div>
                                     <Link to="/profissionais" className="bg-green text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-green-dark transition-colors flex items-center gap-2">
                                         <Plus className="w-4 h-4" />
-                                        Solicitar Orcamento
+                                        Solicitar Orçamento
                                     </Link>
                                 </div>
                             ) : (
@@ -251,7 +285,7 @@ export default function ClientDashboard() {
                                                         {chat.last_message_at ? new Date(chat.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-gray-500 truncate mt-0.5">{chat.last_message || 'Orcamento solicitado'}</p>
+                                                <p className="text-xs text-gray-500 truncate mt-0.5">{chat.last_message || 'Orçamento solicitado'}</p>
                                                 <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${chat.status === 'active' ? 'bg-green/10 text-green' : 'bg-gray-100 text-gray-500'}`}>
                                                     {chat.status === 'active' ? 'Ativo' : 'Encerrado'}
 <button onClick={(e) => { e.stopPropagation(); deleteChat(chat.id) }} className="text-red-400 hover:text-red-600 p-1">
@@ -288,7 +322,7 @@ export default function ClientDashboard() {
                                             activeQuote ? (
                                                 <div className="flex items-center gap-2 bg-green/10 px-4 py-2 rounded-xl border border-green/20">
                                                     <div className="text-left">
-                                                        <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orcamento</p>
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orçamento</p>
                                                         <p className="text-green font-bold text-sm">R$ {Number(activeQuote.amount).toFixed(2)}</p>
                                                     </div>
                                                     <button onClick={handleHire} className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2">

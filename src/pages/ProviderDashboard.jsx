@@ -8,7 +8,8 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield, FileText
+    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield, FileText,
+    BookOpen, Download, ArrowRight, Check, Menu, Bell, FileDown
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
 import ProviderQuotesTab from '../components/ProviderQuotesTab'
@@ -134,8 +135,13 @@ export default function ProviderDashboard() {
                     loadProviderData()
                 }
             )
-            .subscribe()
-.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_conversations' }, () => { playNotificationSound(); if ('Notification' in window && Notification.permission === 'granted') { new Notification('LimpFlix', { body: 'Novo pedido de orcamento!', icon: '/icon-192.png' }) } })
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_conversations' }, () => { 
+                    playNotificationSound(); 
+                    if ('Notification' in window && Notification.permission === 'granted') { 
+                        new Notification('LimpFlix', { body: 'Novo pedido de orçamento!', icon: '/icon-192.png' }) 
+                    } 
+                })
+                .subscribe()
 
         return () => {
             supabase.removeChannel(channel)
@@ -510,7 +516,8 @@ export default function ProviderDashboard() {
         { id: 'referrals', label: 'Indicações', icon: Users },
         { id: 'messages', label: 'Mensagens', icon: MessageSquare },
         { id: 'settings', label: 'Configurações', icon: Settings },
-        { id: 'quotes', label: 'Orcamentos', icon: FileText },
+        { id: 'quotes', label: 'Orçamentos', icon: FileText },
+        { id: 'academy', label: 'Academia', icon: GraduationCap },
         { id: 'verification', label: 'Verificações', icon: Shield },
     ]
 
@@ -999,6 +1006,75 @@ export default function ProviderDashboard() {
                                 conversationId={selectedChat?.id}
                                 otherPartyName={selectedChat?.client_name}
                             />
+                        </div>
+                    </div>
+                )}
+
+                {/* Academy Tab */}
+                {activeTab === 'academy' && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-fade-in">
+                        <div className="flex items-center gap-3 mb-8">
+                            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                                <GraduationCap className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900">Academia Limpflix</h2>
+                                <p className="text-sm text-gray-500">Materiais de treinamento e capacitação profissional</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-blue-200 transition-all group">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                                        <FileText className="w-6 h-6 text-blue-500" />
+                                    </div>
+                                    <a 
+                                        href="/academy/LimpFlix_Manual_Treinamento_Completo.docx" 
+                                        download
+                                        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                                        title="Download .docx"
+                                    >
+                                        <Download className="w-5 h-5" />
+                                    </a>
+                                </div>
+                                <h3 className="font-bold text-gray-900 mb-1">Manual de Treinamento Completo</h3>
+                                <p className="text-sm text-gray-500 mb-4">Guia definitivo com padrões de qualidade, atendimento e protocolos LimpFlix.</p>
+                                <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider">
+                                    <FileDown className="w-4 h-4" />
+                                    DOCX • 26 KB
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-red-200 transition-all group">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                                        <FileText className="w-6 h-6 text-red-500" />
+                                    </div>
+                                    <a 
+                                        href="/academy/manual_limpeza_domestica_simples.pdf" 
+                                        download
+                                        className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+                                        title="Download .pdf"
+                                    >
+                                        <Download className="w-5 h-5" />
+                                    </a>
+                                </div>
+                                <h3 className="font-bold text-gray-900 mb-1">Manual de Limpeza Doméstica</h3>
+                                <p className="text-sm text-gray-500 mb-4">Instruções práticas e simplificadas para execução de serviços domésticos de alta performance.</p>
+                                <div className="flex items-center gap-2 text-xs font-bold text-red-600 uppercase tracking-wider">
+                                    <FileDown className="w-4 h-4" />
+                                    PDF • 600 KB
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-12 bg-blue-50/50 rounded-2xl p-8 border border-blue-100 text-center">
+                            <Award className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                            <h3 className="text-lg font-bold text-blue-900 mb-2">Novos conteúdos em breve</h3>
+                            <p className="text-blue-700/70 text-sm max-w-md mx-auto">
+                                Estamos preparando vídeos aulas, testes de certificação e novos manuais para ajudar você a se tornar um profissional Elite.
+                            </p>
                         </div>
                     </div>
                 )}

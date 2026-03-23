@@ -123,8 +123,8 @@ export default function ProviderProfile() {
                                 to={`/solicitar-orcamento?profissional=${provider.id}`}
                                 className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
                             >
-                                <Calendar className="w-5 h-5" />
-                                Orçamento
+                                <FileText className="w-5 h-5" />
+                                Solicitar Orçamento
                             </Link>
                         </div>
                     </div>
