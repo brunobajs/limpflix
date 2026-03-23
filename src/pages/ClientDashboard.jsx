@@ -148,6 +148,10 @@ export default function ClientDashboard() {
         try {
             await supabase.from('service_bookings').update({ status: 'completed', updated_at: new Date().toISOString(), completed_at: new Date().toISOString() }).eq('id', activeBooking.id)
             await supabase.from('service_providers').update({ is_busy: false }).eq('id', activeBooking.provider_id)
+            if (selectedChat) {
+                await supabase.from('chat_conversations').update({ status: 'completed' }).eq('id', selectedChat.id)
+                loadChats(user.id)
+            }
             checkActiveBooking(activeBooking.provider_id)
             setShowReviewModal(true)
         } catch (err) { console.error(err); alert('Erro ao confirmar serviço.') }
@@ -289,9 +293,11 @@ export default function ClientDashboard() {
                                                 <p className="text-xs text-gray-500 truncate mt-0.5">{chat.last_message || 'Orçamento solicitado'}</p>
                                                 <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${chat.status === 'active' ? 'bg-green/10 text-green' : 'bg-gray-100 text-gray-500'}`}>
                                                     {chat.status === 'active' ? 'Ativo' : 'Encerrado'}
-<button onClick={(e) => { e.stopPropagation(); deleteChat(chat.id) }} className="text-red-400 hover:text-red-600 p-1">
-  <Trash2 className="w-3 h-3" />
-</button>
+                                                {chat.status !== 'active' && (
+                                                    <button onClick={(e) => { e.stopPropagation(); deleteChat(chat.id) }} className="text-red-400 hover:text-red-600 p-1 ml-1">
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
 
                                                 </span>
                                             </div>
@@ -320,21 +326,37 @@ export default function ClientDashboard() {
                                     </div>
                                     <div>
                                         {selectedChat.status === 'active' && !activeBooking && (
-                                            activeQuote ? (
-                                                <div className="flex items-center gap-2 bg-green/10 px-4 py-2 rounded-xl border border-green/20">
-                                                    <div className="text-left">
-                                                        <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orçamento</p>
-                                                        <p className="text-green font-bold text-sm">R$ {Number(activeQuote.amount).toFixed(2)}</p>
+                                            <div className="flex items-center gap-2">
+                                                {activeQuote ? (
+                                                    <div className="flex items-center gap-2 bg-green/10 px-4 py-2 rounded-xl border border-green/20">
+                                                        <div className="text-left">
+                                                            <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orçamento</p>
+                                                            <p className="text-green font-bold text-sm">R$ {Number(activeQuote.amount).toFixed(2)}</p>
+                                                        </div>
+                                                        <button onClick={handleHire} className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2">
+                                                            <CreditCard className="w-3.5 h-3.5" />Pagar
+                                                        </button>
                                                     </div>
-                                                    <button onClick={handleHire} className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2">
-                                                        <CreditCard className="w-3.5 h-3.5" />Pagar
+                                                ) : (
+                                                    <button onClick={handleHire} className="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2">
+                                                        <CheckCircle2 className="w-4 h-4" />Contratar
                                                     </button>
-                                                </div>
-                                            ) : (
-                                                <button onClick={handleHire} className="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2">
-                                                    <CheckCircle2 className="w-4 h-4" />Contratar
+                                                )}
+                                                
+                                                <button 
+                                                    onClick={async () => {
+                                                        if(window.confirm('Deseja encerrar esta conversa?')) {
+                                                            await supabase.from('chat_conversations').update({ status: 'closed' }).eq('id', selectedChat.id)
+                                                            loadChats(user.id)
+                                                            setSelectedChat(prev => ({ ...prev, status: 'closed' }))
+                                                        }
+                                                    }}
+                                                    className="bg-white hover:bg-red-50 text-gray-400 hover:text-red-500 px-3 py-2 rounded-xl text-[10px] font-bold border border-gray-200 transition-all flex items-center gap-1"
+                                                    title="Encerrar conversa para poder apagar"
+                                                >
+                                                    Desistir
                                                 </button>
-                                            )
+                                            </div>
                                         )}
                                         {activeBooking?.status === 'waiting_client_confirmation' && (
                                             <button onClick={confirmCompletion} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2 animate-pulse">

@@ -123,13 +123,15 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                                         </p>
                                     </div>
                                 </button>
-                                <button
-                                    onClick={(e) => deleteConversation(e, conv.id, isUserProvider)}
-                                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all flex-shrink-0 p-1"
-                                    title="Apagar conversa"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                {conv.status !== 'active' && (
+                                    <button
+                                        onClick={(e) => deleteConversation(e, conv.id, isUserProvider)}
+                                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all flex-shrink-0 p-1"
+                                        title="Apagar conversa"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         )
                     })
