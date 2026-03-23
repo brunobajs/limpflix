@@ -117,6 +117,7 @@ export default function ClientDashboard() {
                 .from('chat_conversations')
                 .select('*, provider:service_providers(id, trade_name, responsible_name, profile_image)')
                 .eq('client_id', userId)
+                .eq('deleted_by_client', false)
                 .order('last_message_at', { ascending: false })
             if (error) throw error
             setChats(data || [])
