@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { MessageSquare, Search, Loader2, Trash2 } from 'lucide-react'
@@ -8,6 +8,7 @@ export default function ChatList({ onSelectConversation, selectedId }) {
     const [conversations, setConversations] = useState([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
+    const [providerId, setProviderId] = useState(null)
 
     useEffect(() => {
         if (!user) return
@@ -26,6 +27,8 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                 .select('id')
                 .eq('user_id', user.id)
                 .single()
+
+            setProviderId(providerData?.id || null)
 
             let query = supabase
                 .from('chat_conversations')
@@ -92,7 +95,7 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                     </div>
                 ) : (
                     filteredConversations.map(conv => {
-                        const isUserProvider = conv.provider_id && conv.service_providers?.id === conv.provider_id && user.id === conv.service_providers?.user_id
+                        const isUserProvider = providerId && conv.provider_id === providerId
                         const displayName = isUserProvider
                             ? (conv.client_name || 'Cliente')
                             : (conv.provider_name || conv.service_providers?.trade_name || conv.service_providers?.responsible_name || 'Profissional')

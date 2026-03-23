@@ -789,21 +789,42 @@ export default function ProviderDashboard() {
                                 <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-amber-500" />
                             </button>
 
-                            <button
-                                onClick={futureFeatureAlert}
-                                className="flex items-center justify-between p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+                            <div
+                                className="flex flex-col p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group relative cursor-pointer"
+                                onClick={() => setActiveTab('academy')}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                                        <GraduationCap className="w-6 h-6 text-blue-600" />
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <GraduationCap className="w-6 h-6 text-blue-600" />
+                                        </div>
+                                        <div className="text-left">
+                                            <h3 className="font-bold text-gray-900 leading-tight">Academia Limpflix</h3>
+                                            <p className="text-xs text-gray-400">Materiais de capacitação</p>
+                                        </div>
                                     </div>
-                                    <div className="text-left">
-                                        <h3 className="font-bold text-gray-900 leading-tight">Academia Limpflix</h3>
-                                        <p className="text-xs text-gray-400">Capacite-se para ganhar mais</p>
-                                    </div>
+                                    <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
                                 </div>
-                                <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
-                            </button>
+                                
+                                <div className="flex flex-wrap gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                                    <a 
+                                        href="/academy/LimpFlix_Manual_Treinamento_Completo.docx" 
+                                        download 
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-blue-50 text-blue-700 rounded-xl text-[10px] font-bold hover:bg-blue-100 transition-colors border border-blue-100"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Manual Completo
+                                    </a>
+                                    <a 
+                                        href="/academy/manual_limpeza_domestica_simples.pdf" 
+                                        download 
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-red-50 text-red-700 rounded-xl text-[10px] font-bold hover:bg-red-100 transition-colors border border-red-100"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Manual Limpeza
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
