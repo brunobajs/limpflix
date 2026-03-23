@@ -40,20 +40,9 @@ export default function ClientDashboard() {
     const [pendingQuotes, setPendingQuotes] = useState([])
     const [profileName, setProfileName] = useState('')
     const messagesEndRef = useRef(null)
+    const [mobileView, setMobileView] = useState('list') // 'list' or 'chat'
 
     useEffect(() => { if (!authLoading) { checkUser() } }, [authLoading, user])
-
-    useEffect(() => {
-        if (selectedChat) {
-            loadMessages(selectedChat.id)
-            const channel = supabase
-                .channel(`client-chat:${selectedChat.id}`)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${selectedChat.id}` },
-                    (payload) => { setMessages(prev => [...prev, payload.new]); scrollToBottom() })
-                .subscribe()
-            return () => supabase.removeChannel(channel)
-        }
-    }, [selectedChat])
 
     useEffect(() => {
         if (!authLoading) {
@@ -69,25 +58,35 @@ export default function ClientDashboard() {
     }, [authLoading, user])
 
     async function checkUser() {
-        if (!user) return // Já tratado pelo useEffect acima
-        loadChats(user.id)
-        loadPendingQuotes(user.id)
-        loadProfileName(user.id)
+        if (!user) return
+        try {
+            await Promise.all([
+                loadChats(user.id),
+                loadPendingQuotes(user.id),
+                loadProfileName(user.id)
+            ])
+        } catch (err) {
+            console.error("Erro no checkUser:", err)
+        }
     }
 
     async function loadProfileName(userId) {
-        const { data } = await supabase.from('profiles').select('full_name').eq('id', userId).single()
-        if (data) setProfileName(data.full_name)
+        try {
+            const { data } = await supabase.from('profiles').select('full_name').eq('id', userId).maybeSingle()
+            if (data) setProfileName(data.full_name)
+        } catch (e) {}
     }
 
     async function loadPendingQuotes(userId) {
-        const { data } = await supabase
-            .from('service_quotes')
-            .select('*, provider:service_providers(trade_name, responsible_name, profile_image)')
-            .eq('client_id', userId)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false })
-        setPendingQuotes(data || [])
+        try {
+            const { data } = await supabase
+                .from('service_quotes')
+                .select('*, provider:service_providers(trade_name, responsible_name, profile_image)')
+                .eq('client_id', userId)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: false })
+            setPendingQuotes(data || [])
+        } catch (e) {}
     }
 
     function playNotificationSound() {
@@ -95,13 +94,13 @@ export default function ClientDashboard() {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
             const osc = audioCtx.createOscillator()
             const gain = audioCtx.createGain()
+            osc.connect(gain)
+            gain.connect(audioCtx.destination)
             osc.type = 'sine'
             osc.frequency.setValueAtTime(880, audioCtx.currentTime)
             osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5)
             gain.gain.setValueAtTime(0.1, audioCtx.currentTime)
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5)
-            osc.connect(gain)
-            gain.connect(audioCtx.destination)
             osc.start()
             osc.stop(audioCtx.currentTime + 0.5)
         } catch (e) { console.error('Audio alert failed:', e) }
@@ -116,8 +115,9 @@ export default function ClientDashboard() {
                 schema: 'public', 
                 table: 'chat_messages'
             }, (payload) => {
-                if (payload.new.sender_id !== user.id) {
+                if (payload.new && payload.new.sender_id !== user.id) {
                     playNotificationSound()
+                    loadChats(user.id)
                 }
             })
             .subscribe()
@@ -132,28 +132,57 @@ export default function ClientDashboard() {
                 .eq('client_id', userId)
                 .eq('deleted_by_client', false)
                 .order('last_message_at', { ascending: false })
-            if (error) throw error
+            
+            if (error) {
+                console.error('Supabase error loading chats:', error)
+                return
+            }
             setChats(data || [])
+        } catch (err) { 
+            console.error('Fatal error loading chats:', err)
+        } finally {
             setLoading(false)
-        } catch (err) { console.error('Error loading chats:', err); setLoading(false) }
+        }
     }
 
     async function loadMessages(chatId) {
-        const { data } = await supabase.from('chat_messages').select('*').eq('conversation_id', chatId).order('created_at', { ascending: true })
-        setMessages(data || [])
-        scrollToBottom()
-        if (selectedChat) { checkActiveBooking(selectedChat.provider?.id); loadActiveQuote(chatId) }
+        try {
+            const { data } = await supabase.from('chat_messages').select('*').eq('conversation_id', chatId).order('created_at', { ascending: true })
+            setMessages(data || [])
+            setTimeout(scrollToBottom, 100)
+            if (selectedChat) { 
+                checkActiveBooking(selectedChat.provider?.id)
+                loadActiveQuote(chatId) 
+            }
+        } catch (e) {}
     }
 
     async function loadActiveQuote(chatId) {
-        const { data } = await supabase.from('service_quotes').select('*').eq('conversation_id', chatId).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).single()
-        setActiveQuote(data)
+        try {
+            const { data } = await supabase.from('service_quotes')
+                .select('*')
+                .eq('conversation_id', chatId)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            setActiveQuote(data)
+        } catch (e) {}
     }
 
     async function checkActiveBooking(providerId) {
         if (!providerId) return
-        const { data } = await supabase.from('service_bookings').select('*').eq('client_id', user.id).eq('provider_id', providerId).in('status', ['confirmed', 'in_progress', 'waiting_client_confirmation', 'completed']).order('created_at', { ascending: false }).limit(1).single()
-        setActiveBooking(data)
+        try {
+            const { data } = await supabase.from('service_bookings')
+                .select('*')
+                .eq('client_id', user.id)
+                .eq('provider_id', providerId)
+                .in('status', ['confirmed', 'in_progress', 'waiting_client_confirmation', 'completed'])
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            setActiveBooking(data)
+        } catch (e) {}
     }
 
     async function confirmCompletion() {
@@ -190,9 +219,14 @@ export default function ClientDashboard() {
 
     async function deleteChat(chatId) {
         if (!window.confirm('Tem certeza que deseja apagar esta conversa?')) return
-        await supabase.from('chat_conversations').update({ deleted_by_client: true }).eq('id', chatId)
-        setChats(prev => prev.filter(c => c.id !== chatId))
-        if (selectedChat?.id === chatId) setSelectedChat(null)
+        try {
+            await supabase.from('chat_conversations').update({ deleted_by_client: true }).eq('id', chatId)
+            setChats(prev => prev.filter(c => c.id !== chatId))
+            if (selectedChat?.id === chatId) {
+                setSelectedChat(null)
+                setMobileView('list')
+            }
+        } catch (e) {}
     }
 
     function scrollToBottom() { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }
@@ -227,67 +261,68 @@ export default function ClientDashboard() {
 
     return (
         <LocalErrorBoundary>
-            <div className="min-h-screen bg-gray-50 flex flex-col">
+            <div className="min-h-screen bg-gray-50 flex flex-col h-screen overflow-hidden">
                 {pendingQuotes.length > 0 && (
-                    <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between overflow-x-auto gap-4">
+                    <div className="bg-amber-50 border-b border-amber-200 px-4 md:px-6 py-2 flex items-center justify-between overflow-x-auto gap-4 flex-shrink-0">
                         <div className="flex items-center gap-2 flex-shrink-0">
-                            <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
-                            <span className="text-amber-900 font-bold text-sm">Você tem {pendingQuotes.length} orçamento(s) aguardando pagamento:</span>
+                            <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                            <span className="text-amber-900 font-bold text-[10px] md:text-sm">Orçamentos pendentes:</span>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                             {pendingQuotes.map(quote => (
-                                <div key={quote.id} onClick={() => { const chat = chats.find(c => c.id === quote.conversation_id); if (chat) setSelectedChat(chat) }}
-                                    className="bg-white px-4 py-2 rounded-xl shadow-sm border border-amber-200 flex items-center gap-3 cursor-pointer hover:scale-105 transition-all flex-shrink-0">
-                                    <div>
-                                        <p className="text-[10px] text-gray-500 font-bold leading-none">{quote.provider?.trade_name || 'Profissional'}</p>
-                                        <p className="text-sm font-bold text-green">R$ {Number(quote.amount).toFixed(2)}</p>
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-amber-500" />
+                                <div key={quote.id} onClick={() => { 
+                                    const chat = chats.find(c => c.id === quote.conversation_id); 
+                                    if (chat) { setSelectedChat(chat); setMobileView('chat') } 
+                                }}
+                                    className="bg-white px-3 py-1.5 rounded-lg shadow-sm border border-amber-200 flex items-center gap-2 cursor-pointer hover:scale-105 transition-all flex-shrink-0">
+                                    <p className="text-xs font-bold text-green">R$ {Number(quote.amount).toFixed(2)}</p>
+                                    <ArrowRight className="w-3 h-3 text-amber-500" />
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
-                <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-green" />
+                
+                <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between shadow-sm flex-shrink-0">
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="w-8 h-8 md:w-10 md:h-10 bg-green/10 rounded-full flex items-center justify-center">
+                            <User className="w-4 h-4 md:w-5 md:h-5 text-green" />
                         </div>
-                        <div>
-                            <h1 className="text-lg font-bold text-gray-800">Ola, {profileName || 'Cliente'}!</h1>
-                            <p className="text-xs text-gray-500">Suas conversas e solicitacoes</p>
+                        <div className="min-w-0">
+                            <h1 className="text-sm md:text-lg font-bold text-gray-800 truncate">Ola, {profileName.split(' ')[0] || 'Cliente'}!</h1>
+                            <p className="text-[10px] md:text-xs text-gray-400">Meu Painel</p>
                         </div>
                     </div>
-                    <Link to="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 font-medium text-sm mr-2"><ArrowLeft className="w-4 h-4" />Início</Link><Link to="/cliente/orcamentos" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 font-medium text-sm mr-2 border border-gray-200 px-3 py-2 rounded-xl"><FileText className="w-4 h-4" />Orçamentos</Link><Link to="/profissionais" className="bg-green text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-dark transition-colors">
-                        <Plus className="w-4 h-4" />
-                        Nova Solicitacao
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link to="/" className="text-gray-400 hover:text-gray-600 p-2"><ArrowLeft className="w-5 h-5" /></Link>
+                        <Link to="/profissionais" className="bg-green text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1">
+                            <Plus className="w-3 h-3" />
+                            <span className="hidden sm:inline">Novo</span>
+                        </Link>
+                    </div>
                 </div>
-                <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-80px)]">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                        <div className="p-4 border-b border-gray-100 bg-gray-50">
-                            <h2 className="font-bold text-gray-700">Minhas Conversas</h2>
-                            <p className="text-xs text-gray-400 mt-0.5">{chats.length} conversa(s)</p>
+
+                <div className="flex-1 flex overflow-hidden relative">
+                    {/* Lista de Chats */}
+                    <div className={`w-full md:w-80 lg:w-96 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transition-all duration-300 ${
+                        mobileView === 'chat' ? '-translate-x-full md:translate-x-0 hidden md:flex' : 'flex'
+                    }`}>
+                        <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                            <h2 className="font-bold text-gray-700 text-sm">Mensagens</h2>
+                            <span className="bg-green/10 text-green px-2 py-0.5 rounded-full text-[10px] font-bold">{chats.length}</span>
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             {chats.length === 0 ? (
                                 <div className="p-8 text-center flex flex-col items-center gap-4">
-                                    <MessageCircle className="w-16 h-16 text-gray-200" />
-                                    <div>
-                                        <p className="font-bold text-gray-600 mb-1">Nenhuma conversa ainda</p>
-                                        <p className="text-sm text-gray-400 mb-4">Solicite um orçamento para começar</p>
-                                    </div>
-                                    <Link to="/profissionais" className="bg-green text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-green-dark transition-colors flex items-center gap-2">
-                                        <Plus className="w-4 h-4" />
-                                        Solicitar Orçamento
-                                    </Link>
+                                    <MessageCircle className="w-12 h-12 text-gray-100" />
+                                    <p className="text-xs text-gray-400">Nenhuma conversa ativa.</p>
                                 </div>
                             ) : (
                                 chats.map(chat => (
-                                    <div key={chat.id} onClick={() => setSelectedChat(chat)}
+                                    <div key={chat.id} onClick={() => { setSelectedChat(chat); setMobileView('chat') }}
                                         className={`p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedChat?.id === chat.id ? 'bg-green/5 border-l-4 border-l-green' : ''}`}>
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                            <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100">
                                                 {chat.provider?.profile_image ? (
                                                     <img src={chat.provider.profile_image} className="w-full h-full object-cover" />
                                                 ) : (
@@ -296,23 +331,14 @@ export default function ClientDashboard() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start">
-                                                    <h3 className="font-bold text-gray-900 text-sm truncate">
+                                                    <h3 className="font-bold text-gray-900 text-xs truncate">
                                                         {chat.provider?.trade_name || chat.provider?.responsible_name || chat.provider_name || 'Profissional'}
                                                     </h3>
-                                                    <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                                                    <span className="text-[10px] text-gray-400 ml-2">
                                                         {chat.last_message_at ? new Date(chat.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-gray-500 truncate mt-0.5">{chat.last_message || 'Orçamento solicitado'}</p>
-                                                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${chat.status === 'active' ? 'bg-green/10 text-green' : 'bg-gray-100 text-gray-500'}`}>
-                                                    {chat.status === 'active' ? 'Ativo' : 'Encerrado'}
-                                                {chat.status !== 'active' && (
-                                                    <button onClick={(e) => { e.stopPropagation(); deleteChat(chat.id) }} className="text-red-400 hover:text-red-600 p-1 ml-1">
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
-                                                )}
-
-                                                </span>
+                                                <p className="text-[11px] text-gray-500 truncate mt-0.5">{chat.last_message || 'Orçamento solicitado'}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -320,81 +346,102 @@ export default function ClientDashboard() {
                             )}
                         </div>
                     </div>
-                    <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+
+                    {/* Janela de Chat */}
+                    <div className={`flex-1 flex flex-col bg-white transition-all duration-300 ${
+                        mobileView === 'list' ? 'translate-x-full md:translate-x-0 hidden md:flex' : 'flex'
+                    }`}>
                         {selectedChat ? (
                             <>
-                                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                                <div className="p-3 border-b border-gray-100 flex items-center justify-between bg-white shadow-sm z-10">
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setMobileView('list')} className="md:hidden p-2 text-gray-400 hover:text-green">
+                                            <ArrowLeft className="w-5 h-5" />
+                                        </button>
+                                        <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden border border-gray-200">
                                             {selectedChat.provider?.profile_image ? (
                                                 <img src={selectedChat.provider.profile_image} className="w-full h-full object-cover" />
                                             ) : (
-                                                <span className="font-bold text-green">{(selectedChat.provider?.trade_name || selectedChat.provider_name || 'P').charAt(0).toUpperCase()}</span>
+                                                <span className="font-bold text-green text-sm">{(selectedChat.provider?.trade_name || selectedChat.provider_name || 'P').charAt(0).toUpperCase()}</span>
                                             )}
                                         </div>
-                                        <div>
-                                            <h2 className="font-bold text-gray-800">{selectedChat.provider?.trade_name || selectedChat.provider?.responsible_name || selectedChat.provider_name || 'Profissional'}</h2>
-                                            <p className="text-xs text-green flex items-center gap-1"><span className="w-2 h-2 bg-green rounded-full animate-pulse"></span>Online agora</p>
+                                        <div className="min-w-0">
+                                            <h2 className="font-bold text-gray-800 text-sm truncate max-w-[120px] sm:max-w-none">
+                                                {selectedChat.provider?.trade_name || selectedChat.provider_name || 'Profissional'}
+                                            </h2>
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 bg-green rounded-full"></span>
+                                                <span className="text-[10px] text-green font-medium">Atendimento</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div>
-                                        {selectedChat.status === 'active' && !activeBooking && (
-                                            <div className="flex items-center gap-2">
-                                                {activeQuote ? (
-                                                    <div className="flex items-center gap-2 bg-green/10 px-4 py-2 rounded-xl border border-green/20">
-                                                        <div className="text-left">
-                                                            <p className="text-[10px] text-gray-500 uppercase font-bold leading-none">Orçamento</p>
-                                                            <p className="text-green font-bold text-sm">R$ {Number(activeQuote.amount).toFixed(2)}</p>
-                                                        </div>
-                                                        <button onClick={handleHire} className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2">
-                                                            <CreditCard className="w-3.5 h-3.5" />Pagar
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <button onClick={handleHire} className="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2">
-                                                        <CheckCircle2 className="w-4 h-4" />Contratar
-                                                    </button>
-                                                )}
-                                                
-                                                <button 
-                                                    onClick={async () => {
-                                                        if(window.confirm('Deseja encerrar esta conversa?')) {
-                                                            await supabase.from('chat_conversations').update({ status: 'closed' }).eq('id', selectedChat.id)
-                                                            loadChats(user.id)
-                                                            setSelectedChat(prev => ({ ...prev, status: 'closed' }))
-                                                        }
-                                                    }}
-                                                    className="bg-white hover:bg-red-50 text-gray-400 hover:text-red-500 px-3 py-2 rounded-xl text-[10px] font-bold border border-gray-200 transition-all flex items-center gap-1"
-                                                    title="Encerrar conversa para poder apagar"
-                                                >
-                                                    Desistir
-                                                </button>
-                                            </div>
-                                        )}
-                                        {activeBooking?.status === 'waiting_client_confirmation' && (
-                                            <button onClick={confirmCompletion} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all hover:scale-105 flex items-center gap-2 animate-pulse">
-                                                <CheckCircle2 className="w-4 h-4" />Confirmar Conclusao
+                                    <div className="flex items-center gap-2">
+                                        {selectedChat.status === 'active' && (
+                                            <button 
+                                                onClick={async () => {
+                                                    if(window.confirm('Deseja encerrar esta conversa?')) {
+                                                        await supabase.from('chat_conversations').update({ status: 'closed' }).eq('id', selectedChat.id)
+                                                        loadChats(user.id)
+                                                        setSelectedChat(prev => ({ ...prev, status: 'closed' }))
+                                                    }
+                                                }}
+                                                className="text-[10px] font-bold text-gray-400 hover:text-red-500 px-2 py-1"
+                                            >
+                                                Encerrar
                                             </button>
                                         )}
-                                        {activeBooking?.status === 'confirmed' && (<span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold">Agendado</span>)}
-                                        {activeBooking?.status === 'in_progress' && (<span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><Clock className="w-3 h-3" />Em Execucao</span>)}
-                                        {activeBooking?.status === 'completed' && (<span className="bg-green/10 text-green px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Servico Finalizado</span>)}
+                                        {selectedChat.status !== 'active' && (
+                                            <button onClick={() => deleteChat(selectedChat.id)} className="p-2 text-red-400">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
-                                    {messages.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
-                                            <MessageCircle className="w-12 h-12 opacity-20" />
-                                            <p className="text-sm">Nenhuma mensagem ainda. Comece a conversa!</p>
-                                        </div>
-                                    ) : messages.map(msg => {
+
+                                {selectedChat.status === 'active' && (
+                                    <div className="bg-gray-50 border-b border-gray-100 p-2 md:p-3">
+                                        {!activeBooking ? (
+                                            activeQuote ? (
+                                                <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-green/20 shadow-sm">
+                                                    <div className="pl-2">
+                                                        <p className="text-[9px] text-gray-500 font-bold uppercase">Orçamento Recebido</p>
+                                                        <p className="text-green font-extrabold text-sm">R$ {Number(activeQuote.amount).toFixed(2)}</p>
+                                                    </div>
+                                                    <button onClick={handleHire} className="bg-green text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-md">
+                                                        <CreditCard className="w-3.5 h-3.5" />Contratar
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-1">
+                                                    <p className="text-[10px] text-gray-400 italic">Aguardando orçamento do profissional...</p>
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div className="flex items-center justify-between bg-blue-50 p-2 rounded-xl border border-blue-100">
+                                                <div className="flex items-center gap-2 pl-2">
+                                                    <Shield className="w-4 h-4 text-blue-500" />
+                                                    <span className="text-blue-900 text-xs font-bold">Servico em andamento</span>
+                                                </div>
+                                                {activeBooking.status === 'waiting_client_confirmation' && (
+                                                    <button onClick={confirmCompletion} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold animate-pulse">
+                                                        Confirmar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30">
+                                    {messages.map(msg => {
                                         const isMe = msg.sender_id === user.id
                                         return (
                                             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`max-w-[80%] rounded-2xl p-3.5 shadow-sm ${isMe ? 'bg-green text-white rounded-tr-none' : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'}`}>
-                                                    {!isMe && msg.sender_name && (<p className="text-[10px] font-bold text-green mb-1">{msg.sender_name}</p>)}
-                                                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                                                    <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
+                                                <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 shadow-sm ${
+                                                    isMe ? 'bg-green text-white rounded-tr-none' : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
+                                                }`}>
+                                                    <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                                                    <div className={`text-[9px] mt-1 text-right ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
                                                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                 </div>
@@ -403,29 +450,37 @@ export default function ClientDashboard() {
                                     })}
                                     <div ref={messagesEndRef} />
                                 </div>
-                                <div className="p-4 border-t border-gray-100 bg-white">
+
+                                <div className="p-3 border-t border-gray-100 bg-white pb-safe">
                                     <div className="flex gap-2">
-                                        <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                                            disabled={selectedChat.status !== 'active'} placeholder={selectedChat.status === 'active' ? "Digite sua mensagem..." : "Esta conversa foi encerrada."}
-                                            className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green disabled:opacity-50" />
-                                        <button onClick={sendMessage} disabled={!newMessage.trim() || selectedChat.status !== 'active'}
-                                            className="p-3 bg-green text-white rounded-xl hover:bg-green-dark disabled:opacity-50 disabled:bg-gray-300 transition-colors">
+                                        <input 
+                                            type="text" 
+                                            value={newMessage} 
+                                            onChange={(e) => setNewMessage(e.target.value)} 
+                                            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                                            disabled={selectedChat.status !== 'active'} 
+                                            placeholder={selectedChat.status === 'active' ? "Mensagem..." : "Chat encerrado"}
+                                            className="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green disabled:opacity-50" 
+                                        />
+                                        <button 
+                                            onClick={sendMessage} 
+                                            disabled={!newMessage.trim() || selectedChat.status !== 'active'}
+                                            className="p-2.5 bg-green text-white rounded-xl disabled:opacity-50 transition-transform active:scale-95"
+                                        >
                                             <Send className="w-5 h-5" />
                                         </button>
                                     </div>
                                 </div>
                             </>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 gap-4">
-                                <MessageCircle className="w-16 h-16 opacity-20" />
-                                <div className="text-center">
-                                    <p className="text-lg font-bold text-gray-600 mb-1">Selecione uma conversa</p>
-                                    <p className="text-sm text-gray-400">Escolha um prestador ao lado para ver as mensagens</p>
-                                </div>
+                            <div className="flex-1 flex flex-col items-center justify-center text-gray-300 p-8 gap-4">
+                                <MessageCircle className="w-12 h-12 opacity-10" />
+                                <p className="text-sm font-medium">Selecione uma conversa para começar</p>
                             </div>
                         )}
                     </div>
                 </div>
+
                 {showReviewModal && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
