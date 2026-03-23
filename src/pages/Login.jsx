@@ -48,7 +48,7 @@ export default function Login() {
                 if (profile?.role === 'provider' || isServiceProvider) {
                     navigate('/dashboard')
                 } else {
-                    navigate('/cliente/dashboard')
+                    navigate('/')
                 }
             } else {
                 if (!fullName.trim()) {
