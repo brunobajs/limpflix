@@ -53,7 +53,7 @@ export default function PaymentSuccess() {
                         client_id: clientId,
                         service_name: serviceName || 'Limpeza/Serviço especial',
                         total_amount: amount,
-                        platform_fee: amount * 0.10, // 5% plataforma + 1% indicação
+                        platform_fee: amount * 0.10, // 10% plataforma (ajustado conforme indicações)
                         provider_net_amount: amount * 0.90,
                         status: 'confirmed',
                         payment_status: 'paid',
@@ -111,15 +111,15 @@ export default function PaymentSuccess() {
             let clientReferrerId = clientProfile?.referred_by_provider_id
             let providerReferrerId = provider?.referrer_id
 
-            // Nova regra conforme solicitação do usuário:
-            // 94% Prestador
-            // 5% Plataforma
-            // 1% Indicação (pode ser 0.5% para o indicador do cliente e 0.5% para o do profissional)
+            // Distribuição:
+            // 90% Prestador
+            // 8% Plataforma (com indicação) / 10% (sem indicação)
+            // 2% total para indicação: 2% se 1 indicador, 1% cada se 2 indicadores
 
-            let providerAmt = totalamount * 0.90
-            let totalReferralAmt = totalAmount * 0.02
+            let providerAmt = totalAmount * 0.90
+            let totalReferralPool = totalAmount * 0.02
 
-            // 3. Executar Repasse ao Prestador (94%)
+            // 3. Executar Repasse ao Prestador (90%)
             try {
                 await sendPayoutPix({
                     pixKey: provider.pix_key,
@@ -131,7 +131,7 @@ export default function PaymentSuccess() {
                 console.error('Failed to send automated payout to provider:', err)
             }
 
-            // 4. Executar Repasse aos Indicadores (Total 1%)
+            // 4. Executar Repasse aos Indicadores (total 2%: se 1 indicador = 2%, se 2 indicadores = 1% cada)
             const referrers = []
             if (clientReferrerId) referrers.push(clientReferrerId)
             if (providerReferrerId && providerReferrerId !== providerId) {
@@ -142,7 +142,7 @@ export default function PaymentSuccess() {
             }
 
             if (referrers.length > 0) {
-                const individualReferralAmt = totalReferralAmt / referrers.length
+                const individualReferralAmt = totalReferralPool / referrers.length
 
                 for (const refId of referrers) {
                     const { data: referrer } = await supabase
@@ -151,7 +151,7 @@ export default function PaymentSuccess() {
                         .eq('id', refId)
                         .single()
 
-                    if (referrer?.pix_key) {
+                    if (referrer?.pix_key && individualReferralAmt > 0) {
                         try {
                             await sendPayoutPix({
                                 pixKey: referrer.pix_key,

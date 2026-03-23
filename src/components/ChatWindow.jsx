@@ -380,7 +380,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                                     placeholder="Ex: 150.00"
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-navy text-lg font-bold"
                                 />
-                                <p className="text-[10px] text-gray-400 mt-1">* Taxa de 8% da plataforma + 2% de indicação serão descontados do valor líquido.</p>
+                                <p className="text-[10px] text-gray-400 mt-1">* Taxa de 8% da plataforma + 2% por indicação serão descontados do valor líquido.</p>
                             </div>
 
                             <div>

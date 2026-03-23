@@ -6,28 +6,28 @@
  * Distribuição dos valores:
  * Com uma indicação:
  * - 90% para o prestador do serviço
- * - 5% para a plataforma
- * - 1% para o indicador
+ * - 8% para a plataforma
+ * - 2% para o indicador
  * 
  * Com duas indicações (cliente e prestador):
  * - 90% para o prestador do serviço
- * - 5% para a plataforma
- * - 0.5% para quem indicou o cliente
- * - 0.5% para quem indicou o prestador
+ * - 8% para a plataforma
+ * - 1% para quem indicou o cliente
+ * - 1% para quem indicou o prestador
  * 
  * Sem indicação:
  * - 90% para o prestador do serviço
- * - 6% para a plataforma
+ * - 10% para a plataforma
  */
 
 import { supabase } from './supabase'
 
 // Constantes para os percentuais de distribuição
 const PROVIDER_FEE = 0.90; // 90%
-const BASE_PLATFORM_FEE = 0.10; // 6% (sem indicação)
-const REFERRAL_PLATFORM_FEE = 0.08; // 5% (com indicação)
-const SINGLE_REFERRAL_FEE = 0.02; // 1% para indicação única
-const SPLIT_REFERRAL_FEE = 0.005; // 0.5% quando há duas indicações
+const BASE_PLATFORM_FEE = 0.10; // 10% (sem indicação)
+const REFERRAL_PLATFORM_FEE = 0.08; // 8% (com indicação)
+const SINGLE_REFERRAL_FEE = 0.02; // 2% para indicação única
+const SPLIT_REFERRAL_FEE = 0.01; // 1% cada quando há duas indicações
 
 /**
  * Calcula a distribuição dos valores do pagamento
@@ -38,17 +38,19 @@ const SPLIT_REFERRAL_FEE = 0.005; // 0.5% quando há duas indicações
 export function calculateSplitAmounts(totalAmount, { hasClientReferral = false, hasProviderReferral = false } = {}) {
     const providerAmount = Math.floor(totalAmount * PROVIDER_FEE);
     
-    // Define a taxa da plataforma baseado na existência de indicações
     const hasAnyReferral = hasClientReferral || hasProviderReferral;
+    const hasBothReferrals = hasClientReferral && hasProviderReferral;
+    
+    // Com 1 indicação: 2% para o indicador
+    // Com 2 indicações: 1% para cada (total 2%)
+    const referralFee = hasBothReferrals ? SPLIT_REFERRAL_FEE : SINGLE_REFERRAL_FEE;
+    
+    const clientReferralAmount = hasClientReferral ? Math.floor(totalAmount * referralFee) : 0;
+    const providerReferralAmount = hasProviderReferral ? Math.floor(totalAmount * referralFee) : 0;
+    
+    // Plataforma: 10% sem indicação, 8% com indicação(ões)
     const platformFee = hasAnyReferral ? REFERRAL_PLATFORM_FEE : BASE_PLATFORM_FEE;
     const platformAmount = Math.floor(totalAmount * platformFee);
-
-    // Calcula comissões de indicação
-    const hasBothReferrals = hasClientReferral && hasProviderReferral;
-    const referralFee = hasBothReferrals ? SPLIT_REFERRAL_FEE : SINGLE_REFERRAL_FEE;
-
-    const clientReferralAmount = hasClientReferral ? Math.floor(totalAmount * referralFee) : 0;
-    const providerReferralAmount = hasProviderReferral && hasBothReferrals ? Math.floor(totalAmount * referralFee) : 0;
 
     return {
         platformAmount,
@@ -109,7 +111,7 @@ export async function processSplitPayment({
         results.provider = await sendPayoutPix({
             pixKey: providerPixKey,
             amount: amounts.providerAmount,
-            description: `Pagamento ${description} (90%)`
+            description: `Repasse ${description} (90%)`
         });
 
         // 2. Pagamento da comissão de indicação do cliente (0.5%, se houver)
@@ -117,7 +119,7 @@ export async function processSplitPayment({
             results.clientReferral = await sendPayoutPix({
                 pixKey: clientReferrerPixKey,
                 amount: amounts.clientReferralAmount,
-                description: `Comissão Indicação Cliente - ${description} (0.5%)`,
+                description: `Comissão Indicação Cliente - ${description}`,
                 isReferralPayout: true
             });
         }
@@ -127,7 +129,7 @@ export async function processSplitPayment({
             results.providerReferral = await sendPayoutPix({
                 pixKey: providerReferrerPixKey,
                 amount: amounts.providerReferralAmount,
-                description: `Comissão Indicação Prestador - ${description} (0.5%)`,
+                description: `Comissão Indicação Prestador - ${description} (2%)`,
                 isReferralPayout: true
             });
         }

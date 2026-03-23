@@ -60,13 +60,13 @@ export default function Terms() {
 
                     <section>
                         <h2 className="text-lg font-bold text-gray-900 mb-3">5. Pagamentos e Comissões</h2>
-                        <p>Os pagamentos são processados pela plataforma Mercado Pago. A LimpFlix retém uma comissão de <strong>6% sobre o valor total do serviço</strong> (5% de taxa de plataforma + 1% de indicação, quando aplicável). Os 94% restantes são creditados diretamente ao profissional responsável pelo serviço.</p>
+                        <p>Os pagamentos são processados pela plataforma Mercado Pago. A LimpFlix retém uma comissão de <strong>10% sobre o valor total do serviço</strong> (sendo que, quando aplicável, 2% são destinados ao indicador do cliente e/ou do profissional). Os 90% restantes são creditados diretamente ao profissional responsável pelo serviço.</p>
                         <p className="mt-2">Saques podem ser solicitados via PIX a qualquer momento, respeitando o saldo mínimo de R$ 20,00.</p>
                     </section>
 
                     <section>
                         <h2 className="text-lg font-bold text-gray-900 mb-3">6. Programa de Indicações</h2>
-                        <p>Profissionais cadastrados recebem um código de indicação exclusivo. Ao indicar outros profissionais ou clientes, o indicador passa a receber 1% de comissão permanente sobre os valores dos serviços realizados pelos indicados, enquanto essa relação se mantiver ativa na plataforma.</p>
+                        <p>Profissionais cadastrados recebem um código de indicação exclusivo. Ao indicar outros profissionais ou clientes, o indicador passa a receber 2% de comissão permanente sobre os valores dos serviços realizados pelos indicados, enquanto essa relação se mantiver ativa na plataforma.</p>
                     </section>
 
                     <section>

@@ -738,7 +738,7 @@ export default function ProviderDashboard() {
                                         <h3 className="font-bold text-lg">Indicar Prestador</h3>
                                     </div>
                                     <p className="text-white/70 text-sm mb-4">
-                                        Indique profissionais e ganhe 1% de comissão permanente sobre os serviços deles.
+                                        Indique profissionais e ganhe 2% de comissão permanente sobre os serviços deles.
                                     </p>
                                     <button onClick={() => copyReferralLink('provider')}
                                         className="w-full bg-green hover:bg-green-dark py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2">
@@ -753,7 +753,7 @@ export default function ProviderDashboard() {
                                         <h3 className="font-bold text-lg">Indicar Cliente</h3>
                                     </div>
                                     <p className="text-white/90 text-sm mb-4">
-                                        Traga seus clientes! Você ganha 1% de comissão e tem <strong>prioridade exclusiva</strong> para atendê-los.
+                                        Traga seus clientes! Você ganha 2% de comissão e tem <strong>prioridade exclusiva</strong> para atendê-los.
                                     </p>
                                     <button onClick={() => copyReferralLink('client')}
                                         className="w-full bg-navy hover:bg-navy-light text-white py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2">
@@ -935,7 +935,7 @@ export default function ProviderDashboard() {
                             <div className="relative z-10">
                                 <h2 className="text-2xl font-bold mb-2">Programa de Indicações LimpFlix</h2>
                                 <p className="text-white/70 text-sm mb-6 max-w-md">
-                                    Indique profissionais ou clientes e ganhe 1% de comissão permanente sobre todos os serviços realizados ou contratados por eles.
+                                    Indique profissionais ou clientes e ganhe 2% de comissão permanente sobre todos os serviços realizados ou contratados por eles.
                                 </p>
                                 
                                 <div className="flex flex-col sm:flex-row gap-4 mb-8">
