@@ -33,14 +33,19 @@ export default function Login() {
             if (isLogin) {
                 const { user: signedUser } = await signIn(email, password)
                 
-                // Fetch profile to determine redirect
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', signedUser.id)
-                    .single()
+                // Fetch profile and provider status to determine correct redirect
+                const [profileRes, providerRes] = await Promise.race([
+                    Promise.all([
+                        supabase.from('profiles').select('role').eq('id', signedUser.id).single(),
+                        supabase.from('service_providers').select('id').eq('user_id', signedUser.id).maybeSingle()
+                    ]),
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout na verificação de perfil')), 4000))
+                ])
 
-                if (profile?.role === 'provider') {
+                const profile = profileRes.data
+                const isServiceProvider = !!providerRes.data
+
+                if (profile?.role === 'provider' || isServiceProvider) {
                     navigate('/dashboard')
                 } else {
                     navigate('/cliente/dashboard')

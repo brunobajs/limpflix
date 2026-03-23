@@ -55,8 +55,21 @@ export default function ClientDashboard() {
         }
     }, [selectedChat])
 
+    useEffect(() => {
+        if (!authLoading) {
+            const timer = setTimeout(() => {
+                if (!user) {
+                    navigate('/login')
+                } else {
+                    checkUser()
+                }
+            }, 1000)
+            return () => clearTimeout(timer)
+        }
+    }, [authLoading, user])
+
     async function checkUser() {
-        if (!user) { navigate('/login'); return }
+        if (!user) return // Já tratado pelo useEffect acima
         loadChats(user.id)
         loadPendingQuotes(user.id)
         loadProfileName(user.id)

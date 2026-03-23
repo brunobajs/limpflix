@@ -149,10 +149,14 @@ export default function ProviderDashboard() {
     }, [provider?.id])
 
     useEffect(() => {
-        if (!authLoading && !user) {
-            navigate('/login')
-            return
-        }
+        // Pequeno delay para evitar redirecionamento falso durante refresh de token ou mudança de rota
+        const timer = setTimeout(() => {
+            if (!authLoading && !user) {
+                console.log('[Dashboard] Redirecting to login: No user found')
+                navigate('/login')
+            }
+        }, 1000)
+        return () => clearTimeout(timer)
     }, [user, authLoading])
 
     function playNotificationSound() {
