@@ -58,9 +58,17 @@ export default function ChatList({ onSelectConversation, selectedId }) {
     async function deleteConversation(e, convId, isProvider) {
         e.stopPropagation()
         if (!window.confirm('Tem certeza que deseja apagar esta conversa?')) return
-        const field = isProvider ? 'deleted_by_provider' : 'deleted_by_client'
-        await supabase.from('chat_conversations').update({ [field]: true }).eq('id', convId)
-        setConversations(prev => prev.filter(c => c.id !== convId))
+        try {
+            const field = isProvider ? 'deleted_by_provider' : 'deleted_by_client'
+            const { error } = await supabase.from('chat_conversations').update({ [field]: true }).eq('id', convId)
+            
+            if (error) throw error
+
+            setConversations(prev => prev.filter(c => c.id !== convId))
+        } catch (err) {
+            console.error('Error deleting conversation:', err.message || err)
+            alert('Erro ao apagar conversa. Verifique as permissões de RLS no banco de dados.')
+        }
     }
 
     const getDisplayName = (conv) => {

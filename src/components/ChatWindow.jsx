@@ -185,11 +185,14 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
         if (!window.confirm('Tem certeza que deseja apagar esta conversa da sua lista?')) return
         try {
             const field = isProvider ? 'deleted_by_provider' : 'deleted_by_client'
-            await supabase.from('chat_conversations').update({ [field]: true }).eq('id', conversationId)
-            window.location.reload() // Recarrega para limpar estado ou poderia ser tratado via props
+            const { error } = await supabase.from('chat_conversations').update({ [field]: true }).eq('id', conversationId)
+            
+            if (error) throw error
+
+            window.location.reload() 
         } catch (err) {
-            console.error('Error deleting conversation:', err)
-            alert('Erro ao apagar conversa.')
+            console.error('Error deleting conversation:', err.message || err)
+            alert('Erro ao apagar conversa. Verifique as permissões de RLS no banco de dados.')
         }
     }
 
