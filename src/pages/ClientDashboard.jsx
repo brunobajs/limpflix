@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus, Trash2, FileText } from 'lucide-react'
+import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus, Trash2, FileText, ClipboardList, CalendarDays } from 'lucide-react'
+import ClientQuotesTab from '../components/ClientQuotesTab'
 import React from 'react'
 class LocalErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -41,6 +43,7 @@ export default function ClientDashboard() {
     const [profileName, setProfileName] = useState('')
     const messagesEndRef = useRef(null)
     const [mobileView, setMobileView] = useState('list') // 'list' or 'chat'
+    const [activeTab, setActiveTab] = useState('chats') // 'chats', 'quotes', 'bookings'
 
     useEffect(() => { if (!authLoading) { checkUser() } }, [authLoading, user])
 
@@ -248,11 +251,31 @@ export default function ClientDashboard() {
         } catch (err) { console.error('Error sending message:', err) }
     }
 
-    function handleHire() {
-        if (!selectedChat) return
-        const amount = activeQuote ? activeQuote.amount : 200.00
-        const quoteId = activeQuote ? activeQuote.id : ''
-        navigate(`/pagamento?quote_id=${selectedChat.quote_request_id || ''}&provider_id=${selectedChat.provider?.id}&chat_id=${selectedChat.id}&amount=${amount}&service_quote_id=${quoteId}`)
+    function handleHire(quoteParam) {
+        const quote = quoteParam || activeQuote
+        if (!quote) return
+        
+        const amount = quote.amount
+        const quoteId = quote.id
+        const chatId = quote.conversation_id || selectedChat?.id
+        const providerId = quote.provider_id || selectedChat?.provider?.id
+        const quoteRequestId = quote.quote_request_id || selectedChat?.quote_request_id || ''
+
+        navigate(`/pagamento?quote_id=${quoteRequestId}&provider_id=${providerId}&chat_id=${chatId}&amount=${amount}&service_quote_id=${quoteId}`)
+    }
+
+    async function handleRejectQuote(quoteId) {
+        if (!window.confirm('Tem certeza que deseja recusar este orçamento?')) return
+        try {
+            await supabase.from('service_quotes').update({ status: 'rejected' }).eq('id', quoteId)
+            alert('Orçamento recusado.')
+            if (activeQuote?.id === quoteId) setActiveQuote(null)
+            loadPendingQuotes(user.id)
+            if (selectedChat) loadMessages(selectedChat.id)
+        } catch (err) {
+            console.error(err)
+            alert('Erro ao recusar orçamento.')
+        }
     }
 
     if (loading) {
@@ -303,46 +326,95 @@ export default function ClientDashboard() {
                 </div>
 
                 <div className="flex-1 flex overflow-hidden relative">
-                    {/* Lista de Chats */}
+                    {/* Barra Lateral com Abas */}
                     <div className={`w-full md:w-80 lg:w-96 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transition-all duration-300 ${
-                        mobileView === 'chat' ? '-translate-x-full md:translate-x-0 hidden md:flex' : 'flex'
+                        mobileView === 'chat' && activeTab === 'chats' ? '-translate-x-full md:translate-x-0 hidden md:flex' : 'flex'
                     }`}>
-                        <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                            <h2 className="font-bold text-gray-700 text-sm">Mensagens</h2>
-                            <span className="bg-green/10 text-green px-2 py-0.5 rounded-full text-[10px] font-bold">{chats.length}</span>
+                        {/* Seletor de Abas */}
+                        <div className="flex border-b border-gray-100 p-1 bg-gray-50/50">
+                            <button 
+                                onClick={() => setActiveTab('chats')}
+                                className={`flex-1 flex flex-col items-center py-2 rounded-xl transition-all ${activeTab === 'chats' ? 'bg-white shadow-sm text-green' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <MessageCircle className="w-5 h-5 mb-0.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Conversas</span>
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('quotes')}
+                                className={`flex-1 flex flex-col items-center py-2 rounded-xl transition-all ${activeTab === 'quotes' ? 'bg-white shadow-sm text-green' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <ClipboardList className="w-5 h-5 mb-0.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Orçamentos</span>
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('bookings')}
+                                className={`flex-1 flex flex-col items-center py-2 rounded-xl transition-all ${activeTab === 'bookings' ? 'bg-white shadow-sm text-green' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <CalendarDays className="w-5 h-5 mb-0.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Serviços</span>
+                            </button>
                         </div>
+
                         <div className="flex-1 overflow-y-auto">
-                            {chats.length === 0 ? (
-                                <div className="p-8 text-center flex flex-col items-center gap-4">
-                                    <MessageCircle className="w-12 h-12 text-gray-100" />
-                                    <p className="text-xs text-gray-400">Nenhuma conversa ativa.</p>
-                                </div>
-                            ) : (
-                                chats.map(chat => (
-                                    <div key={chat.id} onClick={() => { setSelectedChat(chat); setMobileView('chat') }}
-                                        className={`p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedChat?.id === chat.id ? 'bg-green/5 border-l-4 border-l-green' : ''}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100">
-                                                {chat.provider?.profile_image ? (
-                                                    <img src={chat.provider.profile_image} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <span className="font-bold text-green text-sm">{(chat.provider?.trade_name || chat.provider_name || 'P').charAt(0).toUpperCase()}</span>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start">
-                                                    <h3 className="font-bold text-gray-900 text-xs truncate">
-                                                        {chat.provider?.trade_name || chat.provider?.responsible_name || chat.provider_name || 'Profissional'}
-                                                    </h3>
-                                                    <span className="text-[10px] text-gray-400 ml-2">
-                                                        {chat.last_message_at ? new Date(chat.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                                                    </span>
-                                                </div>
-                                                <p className="text-[11px] text-gray-500 truncate mt-0.5">{chat.last_message || 'Orçamento solicitado'}</p>
-                                            </div>
+                            {activeTab === 'chats' && (
+                                <div className="animate-fade-in">
+                                    {chats.length === 0 ? (
+                                        <div className="p-8 text-center flex flex-col items-center gap-4">
+                                            <MessageCircle className="w-12 h-12 text-gray-100" />
+                                            <p className="text-xs text-gray-400">Nenhuma conversa ativa.</p>
                                         </div>
+                                    ) : (
+                                        chats.map(chat => (
+                                            <div key={chat.id} onClick={() => { setSelectedChat(chat); setMobileView('chat'); setActiveTab('chats') }}
+                                                className={`p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedChat?.id === chat.id ? 'bg-green/5 border-l-4 border-l-green' : ''}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100">
+                                                        {chat.provider?.profile_image ? (
+                                                            <img src={chat.provider.profile_image} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="font-bold text-green text-sm">{(chat.provider?.trade_name || chat.provider_name || 'P').charAt(0).toUpperCase()}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-start">
+                                                            <h3 className="font-bold text-gray-900 text-xs truncate">
+                                                                {chat.provider?.trade_name || chat.provider?.responsible_name || chat.provider_name || 'Profissional'}
+                                                            </h3>
+                                                            <span className="text-[10px] text-gray-400 ml-2">
+                                                                {chat.last_message_at ? new Date(chat.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-500 truncate mt-0.5">{chat.last_message || 'Orçamento solicitado'}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'quotes' && (
+                                <div className="p-4 animate-fade-in">
+                                    <ClientQuotesTab 
+                                        clientId={user.id} 
+                                        onOpenChat={(chatId) => {
+                                            const chat = chats.find(c => c.id === chatId);
+                                            if (chat) setSelectedChat(chat);
+                                            setActiveTab('chats');
+                                            setMobileView('chat');
+                                        }}
+                                        onHire={handleHire}
+                                    />
+                                </div>
+                            )}
+
+                            {activeTab === 'bookings' && (
+                                <div className="p-8 text-center flex flex-col items-center gap-4 animate-fade-in">
+                                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center">
+                                        <CalendarDays className="w-8 h-8 text-blue-200" />
                                     </div>
-                                ))
+                                    <p className="text-xs text-gray-400">Seus agendamentos confirmados aparecerão aqui após o pagamento.</p>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -405,9 +477,17 @@ export default function ClientDashboard() {
                                                         <p className="text-[9px] text-gray-500 font-bold uppercase">Orçamento Recebido</p>
                                                         <p className="text-green font-extrabold text-sm">R$ {Number(activeQuote.amount).toFixed(2)}</p>
                                                     </div>
-                                                    <button onClick={handleHire} className="bg-green text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-md">
-                                                        <CreditCard className="w-3.5 h-3.5" />Contratar
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            onClick={() => handleRejectQuote(activeQuote.id)} 
+                                                            className="text-gray-400 hover:text-red-500 px-2 py-1 text-[10px] font-bold"
+                                                        >
+                                                            Recusar
+                                                        </button>
+                                                        <button onClick={handleHire} className="bg-green text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-md">
+                                                            <CreditCard className="w-3.5 h-3.5" />Contratar
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div className="text-center py-1">
