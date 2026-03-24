@@ -22,153 +22,46 @@ export default function PaymentSuccess() {
 
     async function handleFinalizeBooking() {
         try {
-            const providerId = searchParams.get('provider_id')
-            const clientId = searchParams.get('client_id')
-            const amount = parseFloat(searchParams.get('amount'))
-            const serviceName = searchParams.get('service_name')
+            const paymentId = searchParams.get('payment_id') || searchParams.get('collection_id')
             const serviceQuoteId = searchParams.get('service_quote_id')
+            const providerId = searchParams.get('provider_id')
 
-            if (!providerId || !clientId) {
-                console.warn('Missing data for booking confirmation')
+            if (!paymentId) {
+                console.warn('No payment ID found in URL')
                 setLoading(false)
                 return
             }
 
-            // 1. Verificar se o agendamento já existe (evitar duplicidade por refresh)
-            const { data: existing } = await supabase
-                .from('service_bookings')
-                .select('id')
-                .eq('provider_id', providerId)
-                .eq('client_id', clientId)
-                .eq('status', 'confirmed')
-                .order('created_at', { ascending: false })
-                .limit(1)
-
-            // Se não existir um agendamento recente "confirmado", criamos um
-            if (!existing || existing.length === 0) {
-                const { error: insertError } = await supabase
+            // Tentar encontrar o agendamento criado pelo Webhook (polling de até 3 tentativas)
+            let found = false
+            for (let i = 0; i < 3; i++) {
+                const { data: booking } = await supabase
                     .from('service_bookings')
-                    .insert({
-                        provider_id: providerId,
-                        client_id: clientId,
-                        service_name: serviceName || 'Limpeza/Serviço especial',
-                        total_amount: amount,
-                        platform_fee: amount * 0.10, // 10% plataforma (ajustado conforme indicações)
-                        provider_net_amount: amount * 0.90,
-                        status: 'confirmed',
-                        payment_status: 'paid',
-                        quote_id: serviceQuoteId || null
-                    })
+                    .select('id, status')
+                    .eq('external_payment_id', paymentId)
+                    .single()
 
-                if (insertError) throw insertError
-
-                // 1.1 Atualizar status do orçamento se existir
-                if (serviceQuoteId) {
-                    await supabase
-                        .from('service_quotes')
-                        .update({ status: 'paid' })
-                        .eq('id', serviceQuoteId)
+                if (booking && booking.status === 'confirmed') {
+                    found = true
+                    break
                 }
+                
+                // Esperar 2 segundos antes de tentar novamente (tempo para o webhook processar)
+                await new Promise(resolve => setTimeout(resolve, 2000))
+            }
 
-                // 2. Marcar profissional como ocupado
-                await supabase
-                    .from('service_providers')
-                    .update({ is_busy: true })
-                    .eq('id', providerId)
-
-                // 3. REPASSE AUTOMÁTICO (SPLIT 90/8/2)
-                await handleAutomaticRepasse(providerId, clientId, amount)
+            if (!found) {
+                console.log('Booking not yet confirmed by webhook. This is normal if the webhook is still processing.')
             }
 
             setLoading(false)
         } catch (err) {
-            console.error('Error finalizing booking:', err)
+            console.error('Error verifying booking:', err)
             setLoading(false)
         }
     }
 
-    async function handleAutomaticRepasse(providerId, clientId, totalAmount) {
-        try {
-            // 1. Buscar dados do Prestador (Pix e Referência)
-            const { data: provider } = await supabase
-                .from('service_providers')
-                .select('pix_key, referrer_id, trade_name, responsible_name')
-                .eq('id', providerId)
-                .single()
 
-            if (!provider || !provider.pix_key) {
-                console.error('Provider Pix Key not found for automatic payout')
-                return
-            }
-
-            // 2. Buscar indicador (Prioridade: Cliente -> Prestador)
-            const { data: clientProfile } = await supabase
-                .from('profiles')
-                .select('referred_by_provider_id')
-                .eq('id', clientId)
-                .single()
-
-            let clientReferrerId = clientProfile?.referred_by_provider_id
-            let providerReferrerId = provider?.referrer_id
-
-            // Distribuição:
-            // 90% Prestador
-            // 8% Plataforma (com indicação) / 10% (sem indicação)
-            // 2% total para indicação: 2% se 1 indicador, 1% cada se 2 indicadores
-
-            let providerAmt = totalAmount * 0.90
-            let totalReferralPool = totalAmount * 0.02
-
-            // 3. Executar Repasse ao Prestador (90%)
-            try {
-                await sendPayoutPix({
-                    pixKey: provider.pix_key,
-                    amount: providerAmt,
-                    description: `Repasse LimpFlix - ${provider.trade_name || provider.responsible_name}`
-                })
-                console.log('Automated payout sent to provider:', providerAmt)
-            } catch (err) {
-                console.error('Failed to send automated payout to provider:', err)
-            }
-
-            // 4. Executar Repasse aos Indicadores (total 2%: se 1 indicador = 2%, se 2 indicadores = 1% cada)
-            const referrers = []
-            if (clientReferrerId) referrers.push(clientReferrerId)
-            if (providerReferrerId && providerReferrerId !== providerId) {
-                // Evitar duplicidade se for o mesmo ID
-                if (!referrers.includes(providerReferrerId)) {
-                    referrers.push(providerReferrerId)
-                }
-            }
-
-            if (referrers.length > 0) {
-                const individualReferralAmt = totalReferralPool / referrers.length
-
-                for (const refId of referrers) {
-                    const { data: referrer } = await supabase
-                        .from('service_providers')
-                        .select('pix_key')
-                        .eq('id', refId)
-                        .single()
-
-                    if (referrer?.pix_key && individualReferralAmt > 0) {
-                        try {
-                            await sendPayoutPix({
-                                pixKey: referrer.pix_key,
-                                amount: individualReferralAmt,
-                                description: `Comissão Indicação LimpFlix`
-                            })
-                            console.log(`Automated payout sent to referrer ${refId}:`, individualReferralAmt)
-                        } catch (err) {
-                            console.error(`Failed to send automated payout to referrer ${refId}:`, err)
-                        }
-                    }
-                }
-            }
-        } catch (err) {
-            console.error('Error in handleAutomaticRepasse:', err)
-        }
-    }
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">

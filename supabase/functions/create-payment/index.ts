@@ -36,11 +36,16 @@ serve(async (req: Request) => {
       )
     }
 
-    // Monta a URL de retorno com os metadados serializado
+    // Monta a URL de retorno com o metadado serializado
     const origin = req.headers.get('origin') || 'https://limpflix.com'
     const queryParams = metadata ? new URLSearchParams(metadata).toString() : ''
+    
+    // URL do Webhook (Deve ser a URL pública da sua Edge Function no Supabase)
+    // Ex: https://xxx.supabase.co/functions/v1/mercadopago-webhook
+    const WEBHOOK_URL = Deno.env.get('WEBHOOK_URL') || `${origin.replace('http://localhost:5173', 'https://limpflix.com')}/functions/v1/mercadopago-webhook`
 
     const preference = {
+      notification_url: WEBHOOK_URL,
       items: [
         {
           title: serviceName,
