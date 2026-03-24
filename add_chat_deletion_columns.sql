@@ -1,13 +1,11 @@
--- ===============================================
--- LIMPFLIX - V23 - FIX PARA EXCLUSÃO PRIVADA DE CHAT
--- Adiciona colunas para soft-delete individual
--- ===============================================
+-- Opencode installation command (kept for reference)
+-- npm i -g opencode-ai
 
+-- Adicionar colunas de exclusão de chat
 ALTER TABLE public.chat_conversations 
-ADD COLUMN IF NOT EXISTS deleted_by_client BOOLEAN DEFAULT FALSE,
-ADD COLUMN IF NOT EXISTS deleted_by_provider BOOLEAN DEFAULT FALSE;
+ADD COLUMN IF NOT EXISTS deleted_by_client BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS deleted_by_provider BOOLEAN DEFAULT false;
 
--- Garante que o status 'closed' existe ou é aceito (para o botão Desistir)
--- Como a coluna é TEXT, não precisa de ALTER TYPE se não houver CHECK constraint restrita.
--- Mas vamos garantir que o status padrão seja 'active'.
-UPDATE public.chat_conversations SET status = 'active' WHERE status IS NULL;
+-- Habilitar replicação em tempo real para o chat
+ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE chat_conversations;

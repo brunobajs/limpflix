@@ -63,8 +63,15 @@ export default function ChatList({ onSelectConversation, selectedId }) {
         setConversations(prev => prev.filter(c => c.id !== convId))
     }
 
+    const getDisplayName = (conv) => {
+        const isUserProvider = providerId && conv.provider_id === providerId
+        return isUserProvider
+            ? (conv.client_name || 'Cliente')
+            : (conv.provider_name || conv.service_providers?.trade_name || conv.service_providers?.responsible_name || 'Profissional')
+    }
+
     const filteredConversations = conversations.filter(conv => {
-        const name = conv.provider_name || conv.client_name || ''
+        const name = getDisplayName(conv)
         return name.toLowerCase().includes(searchTerm.toLowerCase())
     })
 
@@ -96,33 +103,32 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                 ) : (
                     filteredConversations.map(conv => {
                         const isUserProvider = providerId && conv.provider_id === providerId
-                        const displayName = isUserProvider
-                            ? (conv.client_name || 'Cliente')
-                            : (conv.provider_name || conv.service_providers?.trade_name || conv.service_providers?.responsible_name || 'Profissional')
+                        const displayName = getDisplayName(conv)
                         const lastReadAt = isUserProvider ? conv.provider_last_read_at : conv.client_last_read_at
                         const hasUnread = conv.last_message_at && (!lastReadAt || new Date(conv.last_message_at) > new Date(lastReadAt))
 
                         return (
-                            <div key={conv.id} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all relative group ${selectedId === conv.id ? 'bg-green/10 border-green' : 'hover:bg-gray-50 border-transparent'} border`}>
-                                <button onClick={() => onSelectConversation(conv)} className="flex items-center gap-3 flex-1 text-left overflow-hidden">
-                                    <div className="w-12 h-12 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center text-lg font-bold text-navy relative">
-                                        {displayName?.[0]?.toUpperCase() || '?'}
-                                        {hasUnread && (<span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full"></span>)}
+                            <div key={conv.id} 
+                                onClick={() => onSelectConversation(conv)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all relative group ${selectedId === conv.id ? 'bg-green/10 border-green' : 'hover:bg-gray-50 border-transparent'} border`}
+                            >
+                                <div className="w-12 h-12 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center text-lg font-bold text-navy relative">
+                                    {displayName?.[0]?.toUpperCase() || '?'}
+                                    {hasUnread && (<span className="absolute -top-0 -right-0 w-3.5 h-3.5 bg-red-500 border-2 border-white rounded-full"></span>)}
+                                </div>
+                                <div className="flex-1 overflow-hidden">
+                                    <div className="flex items-center justify-between mb-0.5">
+                                        <h4 className={`text-sm truncate ${hasUnread ? 'text-navy font-bold' : 'text-gray-700 font-medium'}`}>{displayName}</h4>
+                                        {conv.last_message_at && (
+                                            <span className={`text-[10px] flex-shrink-0 ml-1 ${hasUnread ? 'text-green font-bold' : 'text-gray-400'}`}>
+                                                {new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        )}
                                     </div>
-                                    <div className="flex-1 overflow-hidden">
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <h4 className={`font-bold truncate ${hasUnread ? 'text-navy' : 'text-gray-700 font-medium'}`}>{displayName}</h4>
-                                            {conv.last_message_at && (
-                                                <span className={`text-[10px] flex-shrink-0 ml-1 ${hasUnread ? 'text-green font-bold' : 'text-gray-400'}`}>
-                                                    {new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className={`text-xs truncate ${hasUnread ? 'text-gray-900 font-semibold' : 'text-gray-500'}`}>
-                                            {conv.last_message || 'Inicie uma conversa...'}
-                                        </p>
-                                    </div>
-                                </button>
+                                    <p className={`text-xs truncate ${hasUnread ? 'text-gray-900 font-semibold' : 'text-gray-500'}`}>
+                                        {conv.last_message || 'Inicie uma conversa...'}
+                                    </p>
+                                </div>
                                 {conv.status !== 'active' && (
                                     <button
                                         onClick={(e) => deleteConversation(e, conv.id, isUserProvider)}
@@ -140,3 +146,4 @@ export default function ChatList({ onSelectConversation, selectedId }) {
         </div>
     )
 }
+

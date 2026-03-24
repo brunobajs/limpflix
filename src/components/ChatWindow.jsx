@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Send, Image, Loader2, User, Clock, DollarSign, X, CheckCircle2 } from 'lucide-react'
+import { Send, Image, Loader2, User, Clock, DollarSign, X, CheckCircle2, Trash2 } from 'lucide-react'
 
 export default function ChatWindow({ conversationId, otherPartyName }) {
     const { user } = useAuth()
@@ -20,6 +20,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
 
     const [quoteRequest, setQuoteRequest] = useState(null)
     const [showMedia, setShowMedia] = useState(true)
+    const notificationSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'))
 
     useEffect(() => {
         if (!conversationId) return
@@ -39,6 +40,9 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                     filter: `conversation_id=eq.${conversationId}`
                 },
                 (payload) => {
+                    if (payload.new.sender_id !== user.id) {
+                        notificationSound.current.play().catch(e => console.log('Audio play failed:', e))
+                    }
                     setMessages((prev) => [...prev, payload.new])
                     setTimeout(() => scrollToBottom(), 100)
                 }
@@ -177,6 +181,18 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
         }
     }
 
+    async function handleDeleteConversation() {
+        if (!window.confirm('Tem certeza que deseja apagar esta conversa da sua lista?')) return
+        try {
+            const field = isProvider ? 'deleted_by_provider' : 'deleted_by_client'
+            await supabase.from('chat_conversations').update({ [field]: true }).eq('id', conversationId)
+            window.location.reload() // Recarrega para limpar estado ou poderia ser tratado via props
+        } catch (err) {
+            console.error('Error deleting conversation:', err)
+            alert('Erro ao apagar conversa.')
+        }
+    }
+
     async function handleSendMessage(e) {
         e.preventDefault()
         if (!newMessage.trim() || sending) return
@@ -240,15 +256,24 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                         </p>
                     </div>
                 </div>
-                {isProvider && (
+                <div className="flex items-center gap-2">
+                    {isProvider && (
+                        <button
+                            onClick={() => setShowQuoteModal(true)}
+                            className="bg-navy hover:bg-navy-light text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                        >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            Enviar Orçamento
+                        </button>
+                    )}
                     <button
-                        onClick={() => setShowQuoteModal(true)}
-                        className="bg-navy hover:bg-navy-light text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                        onClick={handleDeleteConversation}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        title="Apagar conversa"
                     >
-                        <DollarSign className="w-3.5 h-3.5" />
-                        Enviar Orçamento
+                        <Trash2 className="w-5 h-5" />
                     </button>
-                )}
+                </div>
             </div>
 
             {/* Quote Request Info Panel */}
@@ -413,6 +438,3 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
         </div>
     )
 }
-
-
-

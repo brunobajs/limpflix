@@ -135,11 +135,26 @@ export default function ProviderDashboard() {
                     loadProviderData()
                 }
             )
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_conversations' }, () => { 
-                    playNotificationSound(); 
-                    if ('Notification' in window && Notification.permission === 'granted') { 
-                        new Notification('LimpFlix', { body: 'Novo pedido de orçamento!', icon: '/icon-192.png' }) 
-                    } 
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'chat_conversations',
+                    filter: `provider_id=eq.${provider.id}`
+                }, (payload) => { 
+                    // Se for uma nova conversa ou uma mensagem de um cliente (última leitura do prestador é antiga)
+                    const isNewMessageFromClient = payload.eventType === 'UPDATE' && 
+                        payload.new.last_message_at !== payload.old?.last_message_at &&
+                        payload.new.last_message_at !== payload.new.provider_last_read_at;
+
+                    if (payload.eventType === 'INSERT' || isNewMessageFromClient) {
+                        playNotificationSound(); 
+                        if ('Notification' in window && Notification.permission === 'granted') { 
+                            new Notification('LimpFlix', { 
+                                body: payload.eventType === 'INSERT' ? 'Novo pedido de orçamento!' : 'Nova mensagem recebida!', 
+                                icon: '/icon-192.png' 
+                            }) 
+                        }
+                    }
                 })
                 .subscribe()
 
