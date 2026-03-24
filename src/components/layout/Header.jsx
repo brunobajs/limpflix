@@ -53,10 +53,10 @@ export default function Header() {
                             <>
                                 {/* DASHBOARD VISÍVEL */}
                                 <button
-                                    onClick={() => navigate('/dashboard')}
-                                    className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-sm font-bold"
+                                    onClick={() => navigate(profile?.role === 'provider' ? '/dashboard' : '/cliente/dashboard')}
+                                    className="bg-green hover:bg-green-dark text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-md active:scale-95"
                                 >
-                                    Dashboard
+                                    Meu Painel
                                 </button>
 
                                 {/* MENU USUÁRIO */}
@@ -73,15 +73,15 @@ export default function Header() {
                                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl py-2">
 
                                             <Link
-                                                to="/dashboard"
+                                                to={profile?.role === 'provider' ? '/dashboard' : '/cliente/dashboard'}
                                                 className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                             >
                                                 <LayoutDashboard className="w-4 h-4" />
-                                                Dashboard
+                                                Meu Painel
                                             </Link>
 
                                             <Link
-                                                to="/dashboard?tab=messages"
+                                                to={profile?.role === 'provider' ? '/dashboard?tab=messages' : '/cliente/dashboard'}
                                                 className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                             >
                                                 <MessageSquare className="w-4 h-4" />
@@ -147,18 +147,59 @@ export default function Header() {
                 </div>
 
                 {mobileOpen && (
-                    <div className="md:hidden mt-2 space-y-2">
-                        <Link to="/" onClick={() => setMobileOpen(false)}>Início</Link>
-                        <Link to="/servicos" onClick={() => setMobileOpen(false)}>Serviços</Link>
-                        <Link to="/profissionais" onClick={() => setMobileOpen(false)}>Profissionais</Link>
+                    <div className="md:hidden mt-4 pb-6 space-y-1 animate-fade-in border-t border-white/10 pt-4">
+                        <Link 
+                            to="/" 
+                            onClick={() => setMobileOpen(false)}
+                            className="block px-4 py-3 text-white font-medium hover:bg-white/10 rounded-xl transition-colors"
+                        >
+                            Início
+                        </Link>
+                        <Link 
+                            to="/servicos" 
+                            onClick={() => setMobileOpen(false)}
+                            className="block px-4 py-3 text-white font-medium hover:bg-white/10 rounded-xl transition-colors"
+                        >
+                            Serviços
+                        </Link>
+                        <Link 
+                            to="/profissionais" 
+                            onClick={() => setMobileOpen(false)}
+                            className="block px-4 py-3 text-white font-medium hover:bg-white/10 rounded-xl transition-colors"
+                        >
+                            Profissionais
+                        </Link>
 
                         {isAuthenticated ? (
-                            <>
-                                <button onClick={() => navigate('/dashboard')}>Dashboard</button>
-                                <button onClick={handleSignOut} className="text-red-500">Sair</button>
-                            </>
+                            <div className="mt-4 pt-4 border-t border-white/10 space-y-2 px-4">
+                                <button 
+                                    onClick={() => {
+                                        navigate(profile?.role === 'provider' ? '/dashboard' : '/cliente/dashboard')
+                                        setMobileOpen(false)
+                                    }}
+                                    className="w-full bg-green text-white py-3 rounded-xl font-bold shadow-lg"
+                                >
+                                    Meu Painel
+                                </button>
+                                <button 
+                                    onClick={handleSignOut} 
+                                    className="w-full text-red-400 font-bold py-3 hover:bg-red-500/10 rounded-xl transition-all"
+                                >
+                                    Sair
+                                </button>
+                            </div>
                         ) : (
-                            <button onClick={() => navigate('/login')}>Login</button>
+                            <div className="px-4 mt-6">
+                                <button 
+                                    onClick={() => {
+                                        navigate('/login')
+                                        setMobileOpen(false)
+                                    }} 
+                                    className="w-full bg-green text-white py-3 rounded-xl font-bold shadow-lg"
+                                >
+                                    Login / Criar Conta
+                                </button>
+                            </div>
                         )}
                     </div>
                 )}

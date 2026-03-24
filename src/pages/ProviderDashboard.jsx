@@ -43,10 +43,15 @@ class LocalErrorBoundary extends React.Component {
     render() {
         if (this.state.hasError) {
             return (
-                <div className="p-8 bg-red-50 text-red-800 rounded-2xl border border-red-100">
-                    <h2 className="font-bold mb-2">Ops! Algo deu errado nesta parte.</h2>
-                    <p className="text-xs opacity-70 mb-4">{this.state.error?.message}</p>
-                    <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm">Recarregar</button>
+                <div className="min-h-screen flex items-center justify-center bg-red-50 p-6">
+                    <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-red-100">
+                        <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
+                            <AlertCircle className="w-8 h-8 text-red-500" />
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Ops! Algo falhou no painel.</h2>
+                        <p className="text-gray-500 mb-6 text-sm">A parte de "{this.props.title || 'Dashboard'}" encontrou um erro: {this.state.error?.message}</p>
+                        <button onClick={() => window.location.reload()} className="w-full bg-red-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors">Tentar novamente</button>
+                    </div>
                 </div>
             )
         }
@@ -614,7 +619,7 @@ export default function ProviderDashboard() {
     )
 
     return (
-        <LocalErrorBoundary>
+        <LocalErrorBoundary title="Dashboard Geral">
             <div className="min-h-screen bg-gray-50">
             {/* Welcome modal */}
             {showWelcome && (

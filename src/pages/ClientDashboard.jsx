@@ -390,11 +390,9 @@ export default function ClientDashboard() {
                                                 Encerrar
                                             </button>
                                         )}
-                                        {selectedChat.status !== 'active' && (
-                                            <button onClick={() => deleteChat(selectedChat.id)} className="p-2 text-red-400">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
+                                        <button onClick={() => deleteChat(selectedChat.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
 

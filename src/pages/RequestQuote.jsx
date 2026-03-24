@@ -6,6 +6,30 @@ import {
     MapPin, Camera, FileVideo, AlertCircle, Loader2,
     CheckCircle2, ChevronRight, ChevronLeft, Search
 } from 'lucide-react'
+import React from 'react'
+
+class LocalErrorBoundary extends React.Component {
+    constructor(props) { super(props); this.state = { hasError: false, error: null } }
+    static getDerivedStateFromError(error) { return { hasError: true, error } }
+    componentDidCatch(error, errorInfo) { console.error("RequestQuote crash:", error, errorInfo) }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+                    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertCircle className="w-8 h-8 text-red-600" />
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Ops! Algo deu errado.</h2>
+                        <p className="text-gray-500 mb-6 font-mono text-xs">{this.state.error?.message}</p>
+                        <button onClick={() => window.location.reload()} className="w-full bg-green text-white px-4 py-3 rounded-xl font-bold">Recarregar Página</button>
+                    </div>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
 
 // Steps:
 // 1. Service & Location
@@ -126,11 +150,15 @@ export default function RequestQuote() {
                 .eq('status', 'approved')
                 .eq('is_busy', false)
 
-            // Filtro por serviço e proximidade real
             const serviceName = services.find(s => s.id === serviceId)?.name
 
             // Log para debug
             console.log(`Buscando profissionais para: ${serviceName} perto de ${location.latitude}, ${location.longitude}`)
+
+            if (!providers) {
+                console.warn("Nenhum provedor retornado do Supabase")
+                throw new Error('Não foi possível carregar a lista de profissionais no momento. Tente novamente mais tarde.')
+            }
 
             const eligible = providers.filter(p => {
                 const hasService = p.services_offered?.includes(serviceName)
@@ -190,131 +218,135 @@ export default function RequestQuote() {
 
     if (step === 1) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Solicitar Orçamento 1/2</h1>
-                    <p className="text-gray-500 mb-6">O que você precisa hoje?</p>
+            <LocalErrorBoundary>
+                <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+                    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Solicitar Orçamento 1/2</h1>
+                        <p className="text-gray-500 mb-6">O que você precisa hoje?</p>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Serviço</label>
-                            <select
-                                value={serviceId}
-                                onChange={(e) => setServiceId(e.target.value)}
-                                className="w-full rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50"
-                            >
-                                <option value="">Selecione...</option>
-                                {services.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Localização</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={address}
-                                    onChange={(e) => setAddress(e.target.value)}
-                                    placeholder="Endereço ou CEP"
-                                    className="flex-1 rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50"
-                                />
-                                <button
-                                    onClick={handleGeoLocation}
-                                    className="p-3 bg-green/10 text-green rounded-xl hover:bg-green/20"
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Serviço</label>
+                                <select
+                                    value={serviceId}
+                                    onChange={(e) => setServiceId(e.target.value)}
+                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50"
                                 >
-                                    <MapPin className="w-5 h-5" />
-                                </button>
+                                    <option value="">Selecione...</option>
+                                    {services.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Localização</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={address}
+                                        onChange={(e) => setAddress(e.target.value)}
+                                        placeholder="Endereço ou CEP"
+                                        className="flex-1 rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50"
+                                    />
+                                    <button
+                                        onClick={handleGeoLocation}
+                                        className="p-3 bg-green/10 text-green rounded-xl hover:bg-green/20"
+                                    >
+                                        <MapPin className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="mt-8 flex justify-end">
-                        <button
-                            onClick={() => {
-                                if (serviceId && location) setStep(2)
-                                else alert('Preencha os campos obrigatórios')
-                            }}
-                            className="bg-green text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-green-dark transition-colors"
-                        >
-                            Próximo <ChevronRight className="w-5 h-5" />
-                        </button>
+                        <div className="mt-8 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    if (serviceId && (location || address)) setStep(2)
+                                    else alert('Preencha os campos obrigatórios')
+                                }}
+                                className="bg-green text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-green-dark transition-colors"
+                            >
+                                Próximo <ChevronRight className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </LocalErrorBoundary>
         )
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">Detalhes 2/2</h1>
-                <p className="text-gray-500 mb-6">Envie fotos ou vídeos para ajudar.</p>
+        <LocalErrorBoundary>
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Detalhes 2/2</h1>
+                    <p className="text-gray-500 mb-6">Envie fotos ou vídeos para ajudar.</p>
 
-                {error && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm">
-                        <AlertCircle className="w-4 h-4" />
-                        {error}
-                    </div>
-                )}
+                    {error && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm">
+                            <AlertCircle className="w-4 h-4" />
+                            {error}
+                        </div>
+                    )}
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Descreva o que precisa ser feito..."
-                            className="w-full rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50 h-32"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Fotos/Vídeos</label>
-                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
-                            <input
-                                type="file"
-                                multiple
-                                accept="image/*,video/*"
-                                onChange={handleFileChange}
-                                className="absolute inset-0 opacity-0 cursor-pointer"
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Descreva o que precisa ser feito..."
+                                className="w-full rounded-xl border-gray-300 shadow-sm focus:border-green focus:ring-green p-3 bg-gray-50 h-32"
                             />
-                            <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                            <p className="text-sm text-gray-500">Fotos para Orçamento</p>
                         </div>
 
-                        {/* Previews */}
-                        {previewUrls.length > 0 && (
-                            <div className="flex gap-2 overflow-x-auto py-2">
-                                {previewUrls.map((url, i) => (
-                                    <div key={i} className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                                        <img src={url} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                ))}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Fotos/Vídeos</label>
+                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*,video/*"
+                                    onChange={handleFileChange}
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                />
+                                <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                <p className="text-sm text-gray-500">Fotos para Orçamento</p>
                             </div>
-                        )}
+
+                            {/* Previews */}
+                            {previewUrls.length > 0 && (
+                                <div className="flex gap-2 overflow-x-auto py-2">
+                                    {previewUrls.map((url, i) => (
+                                        <div key={i} className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
+                                            <img src={url} alt="" className="w-full h-full object-cover" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="mt-8 flex justify-between">
+                        <button
+                            onClick={() => setStep(1)}
+                            className="text-gray-500 px-6 py-3 font-semibold hover:text-gray-700"
+                        >
+                            Voltar
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={loading}
+                            className="bg-green text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-green-dark transition-colors disabled:opacity-50"
+                        >
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                            Solicitar Orçamento
+                        </button>
                     </div>
                 </div>
-
-                <div className="mt-8 flex justify-between">
-                    <button
-                        onClick={() => setStep(1)}
-                        className="text-gray-500 px-6 py-3 font-semibold hover:text-gray-700"
-                    >
-                        Voltar
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="bg-green text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-green-dark transition-colors disabled:opacity-50"
-                    >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                        Solicitar Orçamento
-                    </button>
-                </div>
             </div>
-        </div>
+        </LocalErrorBoundary>
     )
 }
 
