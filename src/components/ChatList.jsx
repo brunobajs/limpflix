@@ -36,10 +36,10 @@ export default function ChatList({ onSelectConversation, selectedId }) {
                 .order('last_message_at', { ascending: false })
 
             if (providerData) {
-                query = query
-                    .or(`client_id.eq.${user.id},provider_id.eq.${providerData.id}`)
-                    .eq('deleted_by_provider', false)
+                // Se é um prestador, pode ser prestador em algumas conversas e cliente em outras
+                query = query.or(`and(client_id.eq.${user.id},deleted_by_client.eq.false),and(provider_id.eq.${providerData.id},deleted_by_provider.eq.false)`)
             } else {
+                // Se é apenas cliente
                 query = query
                     .eq('client_id', user.id)
                     .eq('deleted_by_client', false)
