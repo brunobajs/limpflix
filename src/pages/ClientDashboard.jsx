@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus, Trash2, FileText, ClipboardList, CalendarDays } from 'lucide-react'
 import ClientQuotesTab from '../components/ClientQuotesTab'
-import React from 'react'
+
 class LocalErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null } }
     static getDerivedStateFromError(error) { return { hasError: true, error } }
@@ -21,7 +21,6 @@ class LocalErrorBoundary extends React.Component {
         return this.props.children
     }
 }
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 export default function ClientDashboard() {
     const navigate = useNavigate()
