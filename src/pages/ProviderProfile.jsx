@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import {
     Star, MapPin, Phone, Mail, Calendar,
     ArrowLeft, User, Loader2, CheckCircle2,
-    Clock, MessageCircle
+    Clock, MessageCircle, FileText
 } from 'lucide-react'
 
 export default function ProviderProfile() {
