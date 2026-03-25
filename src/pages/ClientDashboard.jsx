@@ -258,9 +258,12 @@ export default function ClientDashboard() {
         const quoteId = quote.id
         const chatId = quote.conversation_id || selectedChat?.id
         const providerId = quote.provider_id || selectedChat?.provider?.id
-        const quoteRequestId = quote.quote_request_id || selectedChat?.quote_request_id || ''
+        
+        // quoteId (from service_quotes) is passed as service_quote_id. 
+        // quote_id (request ID) is only used if available from chat context
+        const requestId = selectedChat?.quote_request_id || ''
 
-        navigate(`/pagamento?quote_id=${quoteRequestId}&provider_id=${providerId}&chat_id=${chatId}&amount=${amount}&service_quote_id=${quoteId}`)
+        navigate(`/pagamento?quote_id=${requestId}&provider_id=${providerId}&chat_id=${chatId}&amount=${amount}&service_quote_id=${quoteId}`)
     }
 
     async function handleRejectQuote(quoteId) {

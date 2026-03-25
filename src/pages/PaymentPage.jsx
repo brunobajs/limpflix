@@ -26,8 +26,9 @@ export default function PaymentPage() {
     const [service, setService] = useState(null)
 
     useEffect(() => {
-        if (!quoteId || !providerId) {
-            alert('Dados inválidos para pagamento')
+        // Validação: Precisamos do provedor e de pelo menos um dos IDs de orçamento (solicitação ou proposta direta)
+        if (!providerId || (!quoteId && !serviceQuoteId)) {
+            alert('Dados insuficientes para iniciar o pagamento. Por favor, tente novamente a partir do chat.')
             navigate('/cliente/dashboard')
             return
         }
