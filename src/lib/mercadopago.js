@@ -22,7 +22,7 @@ export async function initMercadoPago() {
  * Cria uma preferência de pagamento via Edge Function (server-side).
  * O Access Token do Mercado Pago é gerenciado de forma segura no servidor.
  */
-export async function createPaymentPreference({ clientEmail, serviceName, amount, metadata }) {
+export async function createPaymentPreference({ clientEmail, serviceName, amount, metadata, paymentMethod = 'credit_card' }) {
     try {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
         const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -33,7 +33,7 @@ export async function createPaymentPreference({ clientEmail, serviceName, amount
 
         const functionUrl = `${supabaseUrl}/functions/v1/create-payment`
         
-        console.log('[MP] Invocando edge function via FETCH...', functionUrl)
+        console.log(`[MP] Invocando edge function via FETCH (${paymentMethod})...`, functionUrl)
 
         const response = await fetch(functionUrl, {
             method: 'POST',
@@ -42,7 +42,7 @@ export async function createPaymentPreference({ clientEmail, serviceName, amount
                 'apikey': supabaseKey,
                 'Authorization': `Bearer ${supabaseKey}`
             },
-            body: JSON.stringify({ clientEmail, serviceName, amount, metadata })
+            body: JSON.stringify({ clientEmail, serviceName, amount, metadata, paymentMethod })
         })
 
         if (!response.ok) {
@@ -53,15 +53,18 @@ export async function createPaymentPreference({ clientEmail, serviceName, amount
 
         const data = await response.json()
 
-        if (!data?.init_point) {
-            console.error('[MP] Resposta da função sem init_point:', data)
-            throw new Error('Resposta inválida do gateway de pagamento')
+        // Validação condicional dependendo da forma de pagamento
+        if (paymentMethod === 'credit_card' && !data?.init_point) {
+            console.error('[MP] Resposta da função sem init_point para Cartão:', data)
+            throw new Error('Resposta inválida do gateway de pagamento (Cartão)')
+        } else if (paymentMethod === 'pix' && !data?.qr_code) {
+            console.error('[MP] Resposta da função sem qr_code para PIX:', data)
+            throw new Error('Resposta inválida do gateway de pagamento (PIX)')
         }
 
         return data
     } catch (err) {
         console.error('[MP] Erro fatal na chamada da função:', err)
-        // Se o erro for de rede, o fetch lança uma exceção
         if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
             throw new Error('Falha de conexão com o servidor de pagamento (CORS ou rede). Verifique o console.')
         }

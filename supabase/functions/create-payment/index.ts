@@ -3,7 +3,6 @@
 // O Access Token NUNCA é exposto ao frontend.
 //
 // Deploy: npx supabase functions deploy create-payment
-// Variável de ambiente: MERCADO_PAGO_ACCESS_TOKEN (setar no painel Supabase → Settings → Edge Functions)
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
@@ -13,13 +12,12 @@ const corsHeaders = {
 }
 
 serve(async (req: Request) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { clientEmail, serviceName, amount, metadata } = await req.json()
+    const { clientEmail, serviceName, amount, metadata, paymentMethod = 'credit_card' } = await req.json()
 
     if (!clientEmail || !serviceName || !amount) {
       return new Response(
@@ -31,19 +29,61 @@ serve(async (req: Request) => {
     const MP_ACCESS_TOKEN = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN')
     if (!MP_ACCESS_TOKEN) {
       return new Response(
-        JSON.stringify({ error: 'MERCADO_PAGO_ACCESS_TOKEN não configurado nas variáveis de ambiente.' }),
+        JSON.stringify({ error: 'MERCADO_PAGO_ACCESS_TOKEN não configurado.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Monta a URL de retorno com o metadado serializado
     const origin = req.headers.get('origin') || 'https://limpflix.com'
     const queryParams = metadata ? new URLSearchParams(metadata).toString() : ''
-    
-    // URL do Webhook (Deve ser a URL pública da sua Edge Function no Supabase)
-    // Ex: https://xxx.supabase.co/functions/v1/mercadopago-webhook
     const WEBHOOK_URL = Deno.env.get('WEBHOOK_URL') || `${origin.replace('http://localhost:5173', 'https://limpflix.com')}/functions/v1/mercadopago-webhook`
 
+    // ==========================================
+    // FLUXO 1: PIX NATIVO (Transparente)
+    // ==========================================
+    if (paymentMethod === 'pix') {
+      const paymentRequest = {
+        transaction_amount: Number(amount),
+        description: serviceName,
+        payment_method_id: 'pix',
+        payer: {
+          email: clientEmail
+        },
+        metadata: metadata,
+        notification_url: WEBHOOK_URL
+      }
+
+      const response = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': crypto.randomUUID()
+        },
+        body: JSON.stringify(paymentRequest),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json()
+        throw new Error(errData.message || 'Erro ao gerar PIX no Mercado Pago')
+      }
+
+      const data = await response.json()
+      
+      return new Response(JSON.stringify({
+        type: 'pix',
+        id: data.id,
+        qr_code: data.point_of_interaction?.transaction_data?.qr_code,
+        qr_code_base64: data.point_of_interaction?.transaction_data?.qr_code_base64,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ==========================================
+    // FLUXO 2: Cartão de Crédito (Checkout Pro)
+    // ==========================================
     const preference = {
       notification_url: WEBHOOK_URL,
       items: [
@@ -87,10 +127,15 @@ serve(async (req: Request) => {
 
     const data = await response.json()
 
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify({
+      type: 'credit_card',
+      init_point: data.init_point,
+      id: data.id
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+
   } catch (err) {
     console.error('[create-payment] Erro:', err)
     return new Response(
