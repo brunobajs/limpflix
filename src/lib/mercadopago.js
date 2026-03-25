@@ -24,22 +24,25 @@ export async function initMercadoPago() {
  */
 export async function createPaymentPreference({ clientEmail, serviceName, amount, metadata }) {
     try {
+        console.log('[MP] Invocando edge function create-payment...', { serviceName, amount })
         const { data, error } = await supabase.functions.invoke('create-payment', {
             body: { clientEmail, serviceName, amount, metadata }
         })
 
         if (error) {
-            console.error('Edge Function error:', error)
+            console.error('[MP] Erro retornado pela Edge Function:', error)
+            // Se o erro for de rede, o objeto error terá info adicional
             throw new Error(error.message || 'Erro ao criar preferência de pagamento')
         }
 
         if (!data?.init_point) {
+            console.error('[MP] Resposta da função sem init_point:', data)
             throw new Error('Resposta inválida do servidor de pagamento')
         }
 
         return data
     } catch (err) {
-        console.error('Erro ao criar preferência:', err)
+        console.error('[MP] Erro fatal na chamada da função:', err)
         throw err
     }
 }

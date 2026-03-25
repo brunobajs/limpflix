@@ -62,10 +62,20 @@ export default function PaymentPage() {
     }
 
     async function handlePayment() {
-        if (!provider || !user) return
+        if (!provider || !user) {
+            console.error('[Payment] Prestador ou usuário ausente:', { provider, user })
+            alert('Dados do prestador ou login não encontrados. Tente recarregar a página.')
+            return
+        }
         setProcessing(true)
 
         try {
+            console.log('[Payment] Iniciando contratação...', {
+                clientEmail: user.email,
+                amount,
+                serviceQuoteId
+            })
+
             // 1. Criar Preferência no Mercado Pago (Centralizado)
             const preference = await createPaymentPreference({
                 clientEmail: user.email,
@@ -81,16 +91,19 @@ export default function PaymentPage() {
                 }
             })
 
+            console.log('[Payment] Preferência criada com sucesso:', preference.id)
+
             // 2. Redirecionar para o Mercado Pago (Checkout Pro)
             if (preference.init_point) {
                 window.location.href = preference.init_point
             } else {
-                throw new Error('Não foi possível gerar o link de pagamento')
+                throw new Error('Não foi possível gerar o link de pagamento. Verifique o console.')
             }
 
         } catch (err) {
-            console.error('Payment Error', err)
-            alert('Erro ao iniciar pagamento: ' + err.message)
+            console.error('[Payment] Erro no processamento:', err)
+            // No alert amigável, mostramos a mensagem do erro
+            alert('Erro ao iniciar pagamento: ' + (err.message || 'Falha na comunicação com o servidor'))
         } finally {
             setProcessing(false)
         }
