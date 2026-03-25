@@ -24,25 +24,47 @@ export async function initMercadoPago() {
  */
 export async function createPaymentPreference({ clientEmail, serviceName, amount, metadata }) {
     try {
-        console.log('[MP] Invocando edge function create-payment...', { serviceName, amount })
-        const { data, error } = await supabase.functions.invoke('create-payment', {
-            body: { clientEmail, serviceName, amount, metadata }
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+        if (!supabaseUrl || !supabaseKey) {
+            throw new Error('Configuração do Supabase ausente no frontend.')
+        }
+
+        const functionUrl = `${supabaseUrl}/functions/v1/create-payment`
+        
+        console.log('[MP] Invocando edge function via FETCH...', functionUrl)
+
+        const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({ clientEmail, serviceName, amount, metadata })
         })
 
-        if (error) {
-            console.error('[MP] Erro retornado pela Edge Function:', error)
-            // Se o erro for de rede, o objeto error terá info adicional
-            throw new Error(error.message || 'Erro ao criar preferência de pagamento')
+        if (!response.ok) {
+            const errBody = await response.json().catch(() => ({}))
+            console.error('[MP] Erro na resposta da Edge Function:', response.status, errBody)
+            throw new Error(errBody.error || `Erro de servidor (${response.status})`)
         }
+
+        const data = await response.json()
 
         if (!data?.init_point) {
             console.error('[MP] Resposta da função sem init_point:', data)
-            throw new Error('Resposta inválida do servidor de pagamento')
+            throw new Error('Resposta inválida do gateway de pagamento')
         }
 
         return data
     } catch (err) {
         console.error('[MP] Erro fatal na chamada da função:', err)
+        // Se o erro for de rede, o fetch lança uma exceção
+        if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+            throw new Error('Falha de conexão com o servidor de pagamento (CORS ou rede). Verifique o console.')
+        }
         throw err
     }
 }
