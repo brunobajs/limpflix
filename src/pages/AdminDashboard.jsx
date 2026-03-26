@@ -444,12 +444,13 @@ export default function AdminDashboard() {
                                                     <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${
                                                         quote.status === 'pending' ? 'bg-amber-100 text-amber-600' :
                                                         quote.status === 'sent' ? 'bg-blue-100 text-blue-600' :
-                                                        quote.status === 'accepted' ? 'bg-green-100 text-green' :
+                                                        (quote.status === 'accepted' || quote.status === 'paid') ? 'bg-green-100 text-green' :
                                                         'bg-gray-100 text-gray-600'
                                                     }`}>
                                                         {quote.status === 'pending' ? 'Pendente' :
                                                          quote.status === 'sent' ? 'Enviado' :
                                                          quote.status === 'accepted' ? 'Aceito' :
+                                                         quote.status === 'paid' ? 'Pago' :
                                                          quote.status}
                                                     </span>
                                                 </td>
