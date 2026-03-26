@@ -34,9 +34,13 @@ serve(async (req: Request) => {
       )
     }
 
+    // Usa a URL correta do Supabase para o webhook (e não do Vercel)
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://ooewrfhatxbucaatccfb.supabase.co'
+    const WEBHOOK_URL = Deno.env.get('WEBHOOK_URL') || `${SUPABASE_URL}/functions/v1/mercadopago-webhook`
+    
+    // Variáveis para as telas de retorno (usadas pelo fluxo de cartão de crédito)
     const origin = req.headers.get('origin') || 'https://limpflix.com'
     const queryParams = metadata ? new URLSearchParams(metadata).toString() : ''
-    const WEBHOOK_URL = Deno.env.get('WEBHOOK_URL') || `${origin.replace('http://localhost:5173', 'https://limpflix.com')}/functions/v1/mercadopago-webhook`
 
     // ==========================================
     // FLUXO 1: PIX NATIVO (Transparente)

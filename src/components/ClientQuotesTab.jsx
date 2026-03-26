@@ -38,12 +38,16 @@ export default function ClientQuotesTab({ clientId, onOpenChat, onHire }) {
         }
     }
 
-    const filtered = filter === "all" ? quotes : quotes.filter(q => q.status === filter)
+    const filtered = filter === "all" ? quotes : quotes.filter(q => {
+        if (filter === "accepted") return q.status === "accepted" || q.status === "paid"
+        return q.status === filter
+    })
 
     const statusConfig = {
         pending: { label: "Pendente", color: "bg-amber-100 text-amber-700", icon: Clock },
         sent: { label: "Enviado", color: "bg-blue-100 text-blue-600", icon: FileText },
-        accepted: { label: "Aprovado", color: "bg-green/10 text-green", icon: CheckCircle2 },
+        accepted: { label: "Aprovado/Pago", color: "bg-green/10 text-green", icon: CheckCircle2 },
+        paid: { label: "Aprovado/Pago", color: "bg-green/10 text-green", icon: CheckCircle2 },
         rejected: { label: "Recusado", color: "bg-red-100 text-red-600", icon: XCircle },
     }
 
@@ -55,7 +59,7 @@ export default function ClientQuotesTab({ clientId, onOpenChat, onHire }) {
                 {[
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Pendentes" },
-                    { value: "accepted", label: "Aprovados" },
+                    { value: "accepted", label: "Aprovados/Pagos" },
                     { value: "rejected", label: "Recusados" },
                 ].map(f => (
                     <button key={f.value} onClick={() => setFilter(f.value)}

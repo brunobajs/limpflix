@@ -27,12 +27,16 @@ export default function ProviderQuotesTab({ providerId }) {
         }
     }
 
-    const filtered = filter === "all" ? quotes : quotes.filter(q => q.status === filter)
+    const filtered = filter === "all" ? quotes : quotes.filter(q => {
+        if (filter === "accepted") return q.status === "accepted" || q.status === "paid"
+        return q.status === filter
+    })
 
     const statusConfig = {
         pending: { label: "Pendente", color: "bg-amber-100 text-amber-700", icon: Clock },
         sent: { label: "Enviado", color: "bg-blue-100 text-blue-600", icon: FileText },
-        accepted: { label: "Aprovado", color: "bg-green/10 text-green", icon: CheckCircle2 },
+        accepted: { label: "Aprovado/Pago", color: "bg-green/10 text-green", icon: CheckCircle2 },
+        paid: { label: "Aprovado/Pago", color: "bg-green/10 text-green", icon: CheckCircle2 },
         rejected: { label: "Recusado", color: "bg-red-100 text-red-600", icon: XCircle },
     }
 
@@ -44,7 +48,7 @@ export default function ProviderQuotesTab({ providerId }) {
                 {[
                     { label: "Total Enviados", value: quotes.length, color: "text-gray-700" },
                     { label: "Em Aberto", value: quotes.filter(q => q.status === "pending" || q.status === "sent").length, color: "text-amber-600" },
-                    { label: "Aprovados", value: quotes.filter(q => q.status === "accepted").length, color: "text-green" },
+                    { label: "Aprovados/Pagos", value: quotes.filter(q => q.status === "accepted" || q.status === "paid").length, color: "text-green" },
                     { label: "Recusados", value: quotes.filter(q => q.status === "rejected").length, color: "text-red-500" },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
@@ -58,7 +62,7 @@ export default function ProviderQuotesTab({ providerId }) {
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Pendentes" },
                     { value: "sent", label: "Enviados" },
-                    { value: "accepted", label: "Aprovados" },
+                    { value: "accepted", label: "Aprovados/Pagos" },
                     { value: "rejected", label: "Recusados" },
                 ].map(f => (
                     <button key={f.value} onClick={() => setFilter(f.value)}
