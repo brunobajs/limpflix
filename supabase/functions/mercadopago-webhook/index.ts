@@ -46,11 +46,12 @@ serve(async (req) => {
     console.log('[Webhook] Status do pagamento:', payment.status)
 
     if (payment.status === 'approved') {
-        const metadata = payment.metadata
+        const metadata = payment.metadata || {}
         const { provider_id, client_id, amount, service_name, service_quote_id } = metadata
 
         if (!provider_id || !client_id) {
-           throw new Error('Metadados ausentes no pagamento')
+           console.error('[Webhook] Metadados cruciais ausentes:', paymentId)
+           return new Response(JSON.stringify({ message: 'Metadados ausentes, ignorando temporariamente.' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
         // 2. Verificar se já processamos este pagamento (idempotência)

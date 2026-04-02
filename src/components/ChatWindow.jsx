@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Send, Image, Loader2, User, Clock, DollarSign, X, CheckCircle2, Trash2 } from 'lucide-react'
+import { showNotification } from '../hooks/useNotifications'
 
 export default function ChatWindow({ conversationId, otherPartyName }) {
     const { user } = useAuth()

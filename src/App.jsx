@@ -21,6 +21,7 @@ import Privacy from './pages/Privacy'
 import InstallPrompt from './components/InstallPrompt'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
+import GlobalNotificationListener from './components/GlobalNotificationListener'
 
 // Protected Route Component for Admin
 function AdminRoute({ children }) {
@@ -129,6 +130,7 @@ function App() {
                     } />
                 </Routes>
                 <InstallPrompt />
+                <GlobalNotificationListener />
             </Router>
         </AuthProvider>
     )

@@ -113,6 +113,7 @@ serve(async (req: Request) => {
         installments: 12,
       },
       statement_descriptor: 'LimpFlix Serviços',
+      metadata: metadata,
     }
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {

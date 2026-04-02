@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus, Trash2, FileText, ClipboardList, CalendarDays } from 'lucide-react'
 import ClientQuotesTab from '../components/ClientQuotesTab'
+import { useUnreadCount, showNotification } from '../hooks/useNotifications'
+import NotificationBanner from '../components/NotificationBanner'
 
 class LocalErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -237,17 +239,26 @@ export default function ClientDashboard() {
         if (!newMessage.trim() || !selectedChat) return
         try {
             const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
-            await supabase.from('chat_messages').insert({
+            const { error: msgError } = await supabase.from('chat_messages').insert({
                 conversation_id: selectedChat.id,
                 sender_id: user.id,
                 sender_name: profile?.full_name || 'Cliente',
                 sender_type: 'client',
                 message: newMessage.trim()
             })
+            if (msgError) {
+                console.error('Error inserting message:', msgError)
+                alert('Erro ao enviar mensagem: ' + msgError.message)
+                return
+            }
             await supabase.from('chat_conversations').update({ last_message: newMessage.trim(), last_message_at: new Date().toISOString() }).eq('id', selectedChat.id)
             setNewMessage('')
             loadMessages(selectedChat.id)
-        } catch (err) { console.error('Error sending message:', err) }
+            loadChats(user.id)
+        } catch (err) { 
+            console.error('Error sending message:', err)
+            alert('Erro ao enviar mensagem')
+        }
     }
 
     function handleHire(quoteParam) {
@@ -286,6 +297,7 @@ export default function ClientDashboard() {
 
     return (
         <LocalErrorBoundary>
+            <NotificationBanner user={user} />
             <div className="min-h-screen bg-gray-50 flex flex-col h-screen overflow-hidden">
                 {pendingQuotes.length > 0 && (
                     <div className="bg-amber-50 border-b border-amber-200 px-4 md:px-6 py-2 flex items-center justify-between overflow-x-auto gap-4 flex-shrink-0">
@@ -367,7 +379,7 @@ export default function ClientDashboard() {
                                         </div>
                                     ) : (
                                         chats.map(chat => (
-                                            <div key={chat.id} onClick={() => { setSelectedChat(chat); setMobileView('chat'); setActiveTab('chats') }}
+                                            <div key={chat.id} onClick={() => { setSelectedChat(chat); loadMessages(chat.id); setMobileView('chat'); setActiveTab('chats') }}
                                                 className={`p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${selectedChat?.id === chat.id ? 'bg-green/5 border-l-4 border-l-green' : ''}`}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 bg-green/10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100">
@@ -538,9 +550,8 @@ export default function ClientDashboard() {
                                             value={newMessage} 
                                             onChange={(e) => setNewMessage(e.target.value)} 
                                             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                                            disabled={selectedChat.status !== 'active'} 
-                                            placeholder={selectedChat.status === 'active' ? "Mensagem..." : "Chat encerrado"}
-                                            className="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green disabled:opacity-50" 
+                                            placeholder="Digite sua mensagem..."
+                                            className="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green" 
                                         />
                                         <button 
                                             onClick={sendMessage} 

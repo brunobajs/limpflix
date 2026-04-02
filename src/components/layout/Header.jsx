@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Menu, X, User, LogOut, LayoutDashboard, MessageSquare, Sparkles } from 'lucide-react'
+import { Menu, X, User, LogOut, LayoutDashboard, MessageSquare, Sparkles, Bell } from 'lucide-react'
 import UserOnboarding from '../UserOnboarding'
+import { useUnreadCount, requestNotificationPermission } from '../../hooks/useNotifications'
 
 export default function Header() {
     const [mobileOpen, setMobileOpen] = useState(false)
@@ -10,6 +11,16 @@ export default function Header() {
     const navigate = useNavigate()
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [showOnboarding, setShowOnboarding] = useState(false)
+    const { unreadCount } = useUnreadCount(user)
+
+    const handleEnableNotifications = async () => {
+        const granted = await requestNotificationPermission()
+        if (granted) {
+            alert('Notificações ativadas! Você será avisado quando receber mensagens.')
+        } else {
+            alert('Para receber notificações, permita nas configurações do navegador.')
+        }
+    }
 
     async function handleSignOut() {
         try {
@@ -82,11 +93,23 @@ export default function Header() {
 
                                             <Link
                                                 to={profile?.role === 'provider' ? '/dashboard?tab=messages' : '/cliente/dashboard'}
-                                                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 relative"
                                             >
                                                 <MessageSquare className="w-4 h-4" />
                                                 Mensagens
+                                                {unreadCount > 0 && (
+                                                    <span className="absolute left-6 top-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                                    </span>
+                                                )}
                                             </Link>
+                                            <button
+                                                onClick={handleEnableNotifications}
+                                                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full text-left"
+                                            >
+                                                <Bell className="w-4 h-4" />
+                                                Ativar Notificações
+                                            </button>
 
                                             {profile?.role === 'admin' && (
                                                 <Link
