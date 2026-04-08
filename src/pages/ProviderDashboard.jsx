@@ -571,9 +571,9 @@ export default function ProviderDashboard() {
 
     const stats = [
         { label: 'Serviços Realizados', value: provider?.total_services || 0, icon: TrendingUp, color: 'from-blue-500 to-blue-600' },
+        { label: 'Garantia (Retido)', value: `R$ ${(provider?.pending_balance || 0).toFixed(2)}`, icon: Shield, color: 'from-orange-500 to-orange-600' },
+        { label: 'Saldo Sacável', value: `R$ ${(provider?.wallet_balance || 0).toFixed(2)}`, icon: DollarSign, color: 'from-green to-emerald-600' },
         { label: 'Avaliação Média', value: provider?.rating?.toFixed(1) || '5.0', icon: Award, color: 'from-yellow-500 to-yellow-600' },
-        { label: 'Avaliações', value: provider?.total_reviews || 0, icon: Star, color: 'from-purple-500 to-purple-600' },
-        { label: 'Lucro Líquido', value: `R$ ${(provider?.wallet_balance || 0).toFixed(2)}`, icon: DollarSign, color: 'from-green to-emerald-600' },
     ]
 
     const BookingCard = ({ booking, showActions = true }) => (
@@ -583,16 +583,21 @@ export default function ProviderDashboard() {
                     <span className="font-bold text-gray-900 block">{booking.client_name}</span>
                     <span className="text-gray-500 text-sm">{booking.service_name}</span>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                     booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                        booking.status === 'completed' ? 'bg-green/10 text-green' :
-                            booking.status === 'canceled' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-500'
-                    }`}>
+                    booking.status === 'in_progress' ? 'bg-purple-100 text-purple-800' :
+                    booking.status === 'waiting_client_confirmation' ? 'bg-amber-100 text-amber-800' :
+                    booking.status === 'completed' ? 'bg-green/10 text-green' :
+                    booking.status === 'canceled' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-500'
+                }`}>
                     {booking.status === 'pending' ? 'Pendente' :
                         booking.status === 'confirmed' ? 'Confirmado' :
-                            booking.status === 'completed' ? 'Concluído' :
-                                booking.status === 'canceled' ? 'Cancelado' : booking.status}
+                        booking.status === 'in_progress' ? 'Em Andamento' :
+                        booking.status === 'waiting_client_confirmation' ? 'Aguardando Cliente' :
+                        booking.status === 'completed' ? 'Concluído' :
+                        booking.status === 'canceled' ? 'Cancelado' : booking.status}
                 </span>
             </div>
 

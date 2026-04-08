@@ -62,12 +62,15 @@ export default function AdminDashboard() {
             const { count: clientsCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'client')
             const { data: bookings } = await supabase.from('service_bookings').select('total_amount, status, amount_provider, amount_platform, amount_referral')
 
-            const completedBookings = bookings?.filter(b => b.status === 'completed' || b.status === 'confirmed') || []
-            const totalServices = completedBookings.length
-            const totalRevenue = completedBookings.reduce((acc, current) => acc + (Number(current.total_amount) || 0), 0)
-            const providerShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_provider) || 0), 0)
+            const completedBookings = bookings?.filter(b => b.status === 'completed') || []
+            const escrowBookings = bookings?.filter(b => b.status === 'confirmed') || []
+            
+            const totalServices = (completedBookings.length + escrowBookings.length)
+            const totalRevenue = bookings?.reduce((acc, current) => acc + (Number(current.total_amount) || 0), 0) || 0
             const platformShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_platform) || 0), 0)
+            const providerShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_provider) || 0), 0)
             const referralShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_referral) || 0), 0)
+            const escrowFunds = escrowBookings.reduce((acc, current) => acc + (Number(current.amount_provider) || 0), 0)
 
             setStats({
                 totalProviders: providersCount || 0,
@@ -75,9 +78,11 @@ export default function AdminDashboard() {
                 totalServices,
                 totalRevenue,
                 financials: {
-                    providerShare,
                     platformShare,
-                    referralShare
+                    providerShare,
+                    referralShare,
+                    escrowFunds,
+                    totalBookings: bookings?.length || 0
                 }
             })
 
@@ -217,14 +222,14 @@ export default function AdminDashboard() {
                         {[
                             { label: 'Prestadores Totais', value: stats.totalProviders, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
                             { label: 'Clientes Ativos', value: stats.totalClients, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
-                            { label: 'Serviços Concluídos', value: stats.totalServices, icon: Calendar, color: 'text-green-600', bg: 'bg-green-50' },
-                            { label: 'Faturamento Total', value: `R$ ${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50' },
+                            { label: 'Serviços (Garantia)', value: `R$ ${stats.financials.escrowFunds.toLocaleString()}`, icon: Shield, color: 'text-orange-600', bg: 'bg-orange-50' },
+                            { label: 'Faturamento Total', value: `R$ ${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
                         ].map((stat, i) => (
                             <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                 <div className={`${stat.bg} w-12 h-12 rounded-xl flex items-center justify-center mb-4`}>
                                     <stat.icon className={`w-6 h-6 ${stat.color}`} />
                                 </div>
-                                <h3 className="text-3xl font-bold text-gray-900">{stat.value}</h3>
+                                <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">{stat.value}</h3>
                                 <p className="text-gray-500 text-sm mt-1">{stat.label}</p>
                             </div>
                         ))}
@@ -321,7 +326,8 @@ export default function AdminDashboard() {
                                             <th className="px-6 py-4">Cidade</th>
                                             <th className="px-6 py-4">Status</th>
                                             <th className="px-6 py-4">Avaliação</th>
-                                            <th className="px-6 py-4">Saldo Carteira</th>
+                                            <th className="px-6 py-4">Saldo Pendente</th>
+                                            <th className="px-6 py-4">Saldo Disponível</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
@@ -351,7 +357,10 @@ export default function AdminDashboard() {
                                                         <span className="text-sm font-bold">{p.rating || '5.0'}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-sm font-bold text-navy">
+                                                <td className="px-6 py-4 text-sm font-bold text-orange-500">
+                                                    R$ {p.pending_balance?.toLocaleString() || '0,00'}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm font-bold text-green">
                                                     R$ {p.wallet_balance?.toLocaleString() || '0,00'}
                                                 </td>
                                             </tr>
@@ -539,14 +548,22 @@ export default function AdminDashboard() {
                         </div>
                     )}
                     {activeTab === 'marketing' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
                                 <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
                                     <TrendingUp className="w-8 h-8 text-blue-600" />
                                 </div>
                                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Lucro Plataforma</h3>
                                 <p className="text-3xl font-black text-blue-900">R$ {stats.financials.platformShare.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Referente a 8% de taxa</p>
+                                <p className="text-xs text-gray-500">Referente a 8% ou 10% de taxa</p>
+                            </div>
+                            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
+                                <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto">
+                                    <Shield className="w-8 h-8 text-orange-600" />
+                                </div>
+                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Saldo em Garantia</h3>
+                                <p className="text-3xl font-black text-orange-900">R$ {stats.financials.escrowFunds.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Retido no Escrow (Aguardando conclusão)</p>
                             </div>
                             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
                                 <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
@@ -554,7 +571,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pago aos Profissionais</h3>
                                 <p className="text-3xl font-black text-green-900">R$ {stats.financials.providerShare.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Referente a 90% dos serviços</p>
+                                <p className="text-xs text-gray-500">Já liberado para saque</p>
                             </div>
                             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center space-y-4">
                                 <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto">
