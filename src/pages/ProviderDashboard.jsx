@@ -471,6 +471,26 @@ export default function ProviderDashboard() {
         }
     }
 
+    async function toggleAvailability() {
+        setIsSaving(true)
+        const newValue = !provider.accepts_new_quotes
+        try {
+            const { error } = await supabase
+                .from('service_providers')
+                .update({ accepts_new_quotes: newValue })
+                .eq('id', provider.id)
+
+            if (error) throw error
+
+            setProvider(prev => ({ ...prev, accepts_new_quotes: newValue }))
+        } catch (err) {
+            console.error('Error toggling availability:', err)
+            alert('Erro ao atualizar disponibilidade.')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     function toggleService(service) {
         setEditForm(prev => ({
             ...prev,
@@ -668,6 +688,27 @@ export default function ProviderDashboard() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Availability Toggle */}
+                        <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/10 mr-2">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-white/40 uppercase font-bold tracking-wider">Disponibilidade</span>
+                                <span className={`text-xs font-bold ${provider?.accepts_new_quotes ? 'text-green' : 'text-red-400'}`}>
+                                    {provider?.accepts_new_quotes ? 'Recebendo Orçamentos' : 'Pausado'}
+                                </span>
+                            </div>
+                            <button
+                                onClick={toggleAvailability}
+                                disabled={isSaving}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${provider?.accepts_new_quotes ? 'bg-green' : 'bg-gray-600'
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${provider?.accepts_new_quotes ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+
                         <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${provider?.is_busy ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green/20 text-green border border-green/30'
                             }`}>
                             <span className={`w-2 h-2 rounded-full ${provider?.is_busy ? 'bg-red-500' : 'bg-green'}`}></span>
@@ -712,6 +753,27 @@ export default function ProviderDashboard() {
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                     <div className="space-y-6 animate-fade-in">
+                        {/* Availability Warning */}
+                        {!provider.accepts_new_quotes && (
+                            <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <AlertCircle className="w-6 h-6 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-red-900">Seu perfil está invisível! 🚨</h3>
+                                        <p className="text-sm text-red-700">Você desativou o recebimento de novos orçamentos. Clientes não conseguirão encontrar você nas buscas automáticas.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={toggleAvailability}
+                                    className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md shadow-red-600/20 whitespace-nowrap"
+                                >
+                                    Ficar Online Agora
+                                </button>
+                            </div>
+                        )}
+
                         {/* Missing Photos Alert */}
                         {(!provider.profile_image || !provider.logo_image) && (
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
