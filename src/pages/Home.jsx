@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
 import {
     Sofa, BedDouble, Brush, Wind, Droplets, Building2,
     Blinds, Warehouse, HardHat, Sparkles, Home as HomeIcon,
@@ -133,8 +134,95 @@ const TESTIMONIALS = [
 ]
 
 export default function Home() {
+    const [showOnboarding, setShowOnboarding] = useState(false)
+    const servicesRef = useRef(null)
+    const navigate = useNavigate()
+
+    useEffect(() => {
+        // Only show if never seen before
+        const hasSeenOnboarding = localStorage.getItem('limpflix_onboarding_seen')
+        if (!hasSeenOnboarding) {
+            setShowOnboarding(true)
+        }
+    }, [])
+
+    const handleOnboardingChoice = (type) => {
+        localStorage.setItem('limpflix_onboarding_seen', 'true')
+        setShowOnboarding(false)
+        
+        if (type === 'client') {
+            // Scroll to services
+            servicesRef.current?.scrollIntoView({ behavior: 'smooth' })
+        } else {
+            // Redirect to provider registration
+            navigate('/cadastro-profissional')
+        }
+    }
+
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen relative">
+            {/* Onboarding Overlay */}
+            {showOnboarding && (
+                <div className="fixed inset-0 bg-navy/90 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-[2.5rem] max-w-2xl w-full p-8 md:p-12 shadow-2xl relative overflow-hidden">
+                        {/* Decorative Background */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-green/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-navy/5 rounded-full -ml-16 -mb-16 blur-2xl"></div>
+
+                        <div className="relative text-center">
+                            <div className="w-20 h-20 bg-green/10 rounded-2xl flex items-center justify-center mx-auto mb-8 transform rotate-6 scale-110">
+                                <Sparkles className="w-10 h-10 text-green" />
+                            </div>
+                            
+                            <h2 className="text-3xl md:text-4xl font-black text-navy mb-4 leading-tight">
+                                Seja bem-vindo à LimpFlix!
+                            </h2>
+                            <p className="text-xl text-gray-600 mb-10 font-medium">
+                                Você é muito importante para nós. <br className="hidden md:block"/>
+                                <span className="text-green">O que você busca hoje?</span>
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => handleOnboardingChoice('client')}
+                                    className="group p-6 rounded-3xl border-2 border-gray-100 hover:border-green hover:bg-green/5 transition-all text-left flex flex-col items-start gap-4"
+                                >
+                                    <div className="w-12 h-12 bg-green/10 rounded-xl flex items-center justify-center group-hover:bg-green group-hover:text-white transition-colors">
+                                        <Search className="w-6 h-6 text-green group-hover:text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-navy">Busco um serviço</h3>
+                                        <p className="text-gray-500 text-sm">Quero encontrar profissionais para limpar minha casa ou escritório.</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={() => handleOnboardingChoice('provider')}
+                                    className="group p-6 rounded-3xl border-2 border-gray-100 hover:border-navy hover:bg-navy/5 transition-all text-left flex flex-col items-start gap-4"
+                                >
+                                    <div className="w-12 h-12 bg-navy/10 rounded-xl flex items-center justify-center group-hover:bg-navy group-hover:text-white transition-colors">
+                                        <Users className="w-6 h-6 text-navy group-hover:text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-navy">Sou um prestador</h3>
+                                        <p className="text-gray-500 text-sm">Quero oferecer meus serviços e receber orçamentos de clientes.</p>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    localStorage.setItem('limpflix_onboarding_seen', 'true')
+                                    setShowOnboarding(false)
+                                }}
+                                className="mt-8 text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors"
+                            >
+                                Pular introdução
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Hero Section */}
             <section className="relative bg-gradient-to-br from-navy via-navy-light to-navy overflow-hidden">
                 {/* Background elements */}
@@ -215,7 +303,7 @@ export default function Home() {
             </section>
 
             {/* Services Section */}
-            <section className="py-16 md:py-24 bg-gray-50">
+            <section ref={servicesRef} className="py-16 md:py-24 bg-gray-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-12">
                         <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
