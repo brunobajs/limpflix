@@ -110,9 +110,13 @@ export default function GlobalNotificationListener() {
                 table: 'service_quotes'
             }, (payload) => {
                 const quote = payload.new
-                if (profile?.role === 'provider' && quote.provider_id === profile?.id && (quote.status === 'accepted' || quote.status === 'paid')) {
-                    playSound()
-                    showNotification('Orçamento Aprovado!', `O cliente aceitou o orçamento de R$ ${quote.amount}.`, '/dashboard')
+                if (profile?.role === 'provider' && quote.provider_id === profile?.id) {
+                    if (quote.status === 'accepted' || quote.status === 'paid') {
+                        playSound()
+                        showNotification('Orçamento Aprovado!', `O cliente aceitou o orçamento de R$ ${quote.amount}.`, '/dashboard')
+                    } else if (quote.status === 'rejected_by_other') {
+                        showNotification('Vaga Preenchida', `O cliente escolheu outro profissional para este serviço.`, '/dashboard')
+                    }
                 }
             })
             .subscribe()

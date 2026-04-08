@@ -229,7 +229,7 @@ export default function Home() {
                         {SERVICES.map((service, i) => (
                             <Link
                                 key={service.slug}
-                                to={`/servicos?categoria=${service.slug}`}
+                                to={`/profissionais?servico=${service.slug}`}
                                 className="group relative overflow-hidden rounded-2xl aspect-[4/3] shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col justify-end p-5"
                                 style={{ animationDelay: `${i * 50}ms` }}
                             >

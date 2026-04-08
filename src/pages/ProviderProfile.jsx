@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import {
     Star, MapPin, Phone, Mail, Calendar,
     ArrowLeft, User, Loader2, CheckCircle2,
-    Clock, MessageCircle, FileText
+    Clock, MessageCircle, FileText, X
 } from 'lucide-react'
 
 export default function ProviderProfile() {
     const { id } = useParams()
+    const navigate = useNavigate()
+    const { user } = useAuth()
     const [provider, setProvider] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [showAuthModal, setShowAuthModal] = useState(false)
 
     useEffect(() => {
         loadProvider()
@@ -19,8 +23,6 @@ export default function ProviderProfile() {
     async function loadProvider() {
         setLoading(true)
         try {
-            // Removed demo check to ensure only real database entries are shown
-
             const { data, error } = await supabase
                 .from('service_providers')
                 .select('*')
@@ -32,6 +34,14 @@ export default function ProviderProfile() {
             console.error('Error loading provider:', err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleRequestQuote = (e) => {
+        if (!user) {
+            e.preventDefault()
+            setShowAuthModal(true)
+            return
         }
     }
 
@@ -56,7 +66,53 @@ export default function ProviderProfile() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 relative">
+            {/* Friendly Auth Modal */}
+            {showAuthModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl relative">
+                        <button 
+                            onClick={() => setShowAuthModal(false)}
+                            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                        
+                        <div className="text-center">
+                            <div className="w-20 h-20 bg-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <User className="w-10 h-10 text-green" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-4">Quase lá!</h2>
+                            <p className="text-gray-600 mb-8 leading-relaxed">
+                                Para solicitar um orçamento e garantir sua segurança, você precisa estar conectado. <br/>
+                                <span className="font-bold text-green">É super rápido e gratuito!</span>
+                            </p>
+                            
+                            <div className="grid gap-3">
+                                <Link 
+                                    to="/login" 
+                                    className="w-full bg-green text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-dark transition-all transform hover:scale-105 shadow-xl shadow-green/20"
+                                >
+                                    Entrar na minha conta
+                                </Link>
+                                <Link 
+                                    to="/login?tab=register" 
+                                    className="w-full bg-navy text-white py-4 rounded-2xl font-bold text-lg hover:bg-navy-light transition-all"
+                                >
+                                    Criar nova conta
+                                </Link>
+                                <button 
+                                    onClick={() => setShowAuthModal(false)}
+                                    className="text-gray-400 font-medium hover:text-gray-600 mt-2"
+                                >
+                                    Voltar depois
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header Banner */}
             <div className="bg-gradient-to-br from-navy to-navy-light py-12">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -121,6 +177,7 @@ export default function ProviderProfile() {
                             </a>
                             <Link
                                 to={`/solicitar-orcamento?profissional=${provider.id}`}
+                                onClick={handleRequestQuote}
                                 className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
                             >
                                 <FileText className="w-5 h-5" />
@@ -244,6 +301,7 @@ export default function ProviderProfile() {
                             </p>
                             <Link
                                 to={`/solicitar-orcamento?profissional=${provider.id}`}
+                                onClick={handleRequestQuote}
                                 className="block w-full bg-white text-green font-bold py-3 rounded-xl text-center hover:bg-gray-50 transition-colors"
                             >
                                 Solicitar Orçamento
@@ -255,5 +313,3 @@ export default function ProviderProfile() {
         </div >
     )
 }
-
-

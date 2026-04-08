@@ -15,7 +15,7 @@ import ChatList from '../components/ChatList'
 import ProviderQuotesTab from '../components/ProviderQuotesTab'
 import ChatWindow from '../components/ChatWindow'
 import { sendPayoutPix } from '../lib/payouts'
-import { useUnreadCount } from '../hooks/useNotifications'
+import { useUnreadCount, usePendingQuotesCount } from '../hooks/useNotifications'
 import NotificationBanner from '../components/NotificationBanner'
 
 const SERVICE_OPTIONS = [
@@ -66,6 +66,7 @@ export default function ProviderDashboard() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const { unreadCount } = useUnreadCount(user)
+    const { count: pendingQuotesCount } = usePendingQuotesCount(user, provider)
 
     // Data
     const [provider, setProvider] = useState(null)
@@ -541,10 +542,10 @@ export default function ProviderDashboard() {
         { id: 'wallet', label: 'Carteira', icon: Wallet },
         { id: 'reviews', label: 'Avaliações', icon: Star },
         { id: 'referrals', label: 'Indicações', icon: Users },
-        { id: 'messages', label: 'Mensagens', icon: MessageSquare },
+        { id: 'messages', label: 'Mensagens', icon: MessageSquare, badge: unreadCount },
         { id: 'settings', label: 'Configurações', icon: Settings },
-        { id: 'quotes', label: 'Orçamentos', icon: FileText },
-        { id: 'academy', label: 'Academia', icon: GraduationCap },
+        { id: 'quotes', label: 'Orçamentos', icon: FileText, badge: pendingQuotesCount },
+        { id: 'academy', label: 'Academia LimpFlix', icon: GraduationCap },
         { id: 'verification', label: 'Verificações', icon: Shield },
     ]
 

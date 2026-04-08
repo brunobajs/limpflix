@@ -94,6 +94,76 @@ export function useUnreadCount(user) {
     return { unreadCount, loading }
 }
 
+export function usePendingQuotesCount(user, profile) {
+    const [count, setCount] = useState(0)
+    const [loading, setLoading] = useState(true)
+
+    const calculateQuotes = useCallback(async () => {
+        if (!user || !profile) return 0
+
+        try {
+            if (profile.role === 'provider') {
+                const { count: quoteCount } = await supabase
+                    .from('service_quotes')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('provider_id', profile.id)
+                    .eq('status', 'pending')
+                return quoteCount || 0
+            } else {
+                const { count: quoteCount } = await supabase
+                    .from('service_quotes')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('client_id', user.id)
+                    .eq('status', 'sent')
+                return quoteCount || 0
+            }
+        } catch (err) {
+            console.error('Error calculating pending quotes:', err)
+            return 0
+        }
+    }, [user, profile])
+
+    useEffect(() => {
+        if (!user || !profile) {
+            setCount(0)
+            setLoading(false)
+            return
+        }
+
+        const load = async () => {
+            const c = await calculateQuotes()
+            setCount(c)
+            setLoading(false)
+        }
+        load()
+
+        const channel = supabase
+            .channel('quotes-count-listener')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'service_quotes' }, async () => {
+                const c = await calculateQuotes()
+                setCount(c)
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [user, profile, calculateQuotes])
+
+    return { count, loading }
+}
+
+export function useDashboardCounts(user, profile) {
+    const { unreadCount } = useUnreadCount(user)
+    const { count: pendingQuotesCount } = usePendingQuotesCount(user, profile)
+    
+    return {
+        messages: unreadCount,
+        quotes: pendingQuotesCount,
+        total: unreadCount + pendingQuotesCount
+    }
+}
+
 export async function requestNotificationPermission() {
     if (!('Notification' in window)) {
         console.log('This browser does not support notifications')

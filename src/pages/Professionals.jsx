@@ -109,8 +109,8 @@ export default function Professionals() {
 
     async function handleGeoLocation() {
         if (!profile) {
-            alert('Para buscar profissionais perto de você, por favor faça login ou crie uma conta.')
-            navigate('/login')
+            const confirmed = window.confirm('Quase lá! Para encontrar profissionais perto de você, você precisa estar conectado. É super rápido e gratuito! Deseja fazer login agora?')
+            if (confirmed) navigate('/login')
             return
         }
         setGeoLoading(true)

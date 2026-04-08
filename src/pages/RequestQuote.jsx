@@ -139,43 +139,32 @@ export default function RequestQuote() {
 
             if (quoteError) throw quoteError
 
-            // 3. Find 3 Nearest Providers
+            // 3. Find 3 Nearest Providers via Server-side RPC
             if (!location?.latitude || !location?.longitude) {
                 throw new Error('Não foi possível obter sua localização. Por favor, ative o GPS ou digite seu endereço.')
             }
 
-            const { data: providers } = await supabase
-                .from('service_providers')
-                .select('*')
-                .eq('status', 'approved')
-                .eq('is_busy', false)
+            const serviceName = services.find(s => s.id === serviceId)?.name || ''
 
-            const serviceName = services.find(s => s.id === serviceId)?.name
-
-            // Log para debug
-            console.log(`Buscando profissionais para: ${serviceName} perto de ${location.latitude}, ${location.longitude}`)
-
-            if (!providers) {
-                console.warn("Nenhum provedor retornado do Supabase")
-                throw new Error('Não foi possível carregar a lista de profissionais no momento. Tente novamente mais tarde.')
-            }
-
-            const eligible = providers.filter(p => {
-                const hasService = p.services_offered?.includes(serviceName)
-                return hasService
+            const { data: top3, error: rpcError } = await supabase.rpc('get_nearby_providers_top3', {
+                p_lat: location.latitude,
+                p_lng: location.longitude,
+                p_service_name: serviceName
             })
 
-            const sorted = sortByDistance(eligible, location.latitude, location.longitude)
-            const top3 = sorted.slice(0, 3)
+            if (rpcError) throw rpcError
 
-            console.log(`Encontrados ${top3.length} profissionais próximos.`)
-
-            if (top3.length === 0) {
-                throw new Error('Infelizmente não encontramos profissionais disponíveis nesta região para este serviço.')
+            if (!top3 || top3.length === 0) {
+                throw new Error('Infelizmente não encontramos profissionais disponíveis nesta região para este serviço no momento.')
             }
 
-            // 4. Create Chats
+            // 4. Create Chats with the Top 3
             const user = (await supabase.auth.getUser()).data.user
+            const selectedIds = top3.map(p => p.id)
+            
+            // Link the selected providers to the request
+            await supabase.from('quote_requests').update({ selected_provider_ids: selectedIds }).eq('id', quoteRequest.id)
+
             for (const provider of top3) {
                 const { data: chat, error: chatError } = await supabase
                     .from('chat_conversations')
@@ -188,12 +177,16 @@ export default function RequestQuote() {
                     .select()
                     .single()
 
-                if (chatError) continue // Pula se der erro em um chat específico
+                if (chatError) {
+                    console.error('Error creating chat with provider:', provider.id, chatError)
+                    continue
+                }
 
                 // Insert Initial Message
                 await supabase.from('chat_messages').insert({
                     conversation_id: chat.id,
                     sender_id: user.id,
+                    sender_type: 'client',
                     message: `Olá! Solicitei um orçamento para "${serviceName}".\n\nDescrição: ${description}\n\nLocalização: ${address}`
                 })
             }

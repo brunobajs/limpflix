@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Loader2, Star, CreditCard, MessageCircle, User, CheckCircle2, Clock, Send, ArrowRight, ArrowLeft, Shield, X, Plus, Trash2, FileText, ClipboardList, CalendarDays } from 'lucide-react'
 import ClientQuotesTab from '../components/ClientQuotesTab'
-import { useUnreadCount, showNotification } from '../hooks/useNotifications'
+import { useUnreadCount, usePendingQuotesCount, showNotification } from '../hooks/useNotifications'
 import NotificationBanner from '../components/NotificationBanner'
 
 class LocalErrorBoundary extends React.Component {
@@ -27,7 +27,9 @@ class LocalErrorBoundary extends React.Component {
 export default function ClientDashboard() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const { user, loading: authLoading } = useAuth()
+    const { user, profile, loading: authLoading } = useAuth()
+    const { unreadCount } = useUnreadCount(user)
+    const { count: pendingQuotesCount } = usePendingQuotesCount(user, profile)
     const [loading, setLoading] = useState(true)
     const [showWelcome, setShowWelcome] = useState(searchParams.get('welcome') === 'true')
     const [chats, setChats] = useState([])
@@ -348,17 +350,27 @@ export default function ClientDashboard() {
                         <div className="flex border-b border-gray-100 p-1 bg-gray-50/50">
                             <button 
                                 onClick={() => setActiveTab('chats')}
-                                className={`flex-1 flex flex-col items-center py-2 rounded-xl transition-all ${activeTab === 'chats' ? 'bg-white shadow-sm text-green' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`flex-1 flex flex-col items-center py-2 rounded-xl transition-all relative ${activeTab === 'chats' ? 'bg-white shadow-sm text-green' : 'text-gray-400 hover:text-gray-600'}`}
                             >
                                 <MessageCircle className="w-5 h-5 mb-0.5" />
                                 <span className="text-[10px] font-bold uppercase tracking-wider">Conversas</span>
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-1 right-1/4 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
                             </button>
                             <button 
                                 onClick={() => setActiveTab('quotes')}
-                                className={`flex-1 flex flex-col items-center py-2 rounded-xl transition-all ${activeTab === 'quotes' ? 'bg-white shadow-sm text-green' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`flex-1 flex flex-col items-center py-2 rounded-xl transition-all relative ${activeTab === 'quotes' ? 'bg-white shadow-sm text-green' : 'text-gray-400 hover:text-gray-600'}`}
                             >
                                 <ClipboardList className="w-5 h-5 mb-0.5" />
                                 <span className="text-[10px] font-bold uppercase tracking-wider">Orçamentos</span>
+                                {pendingQuotesCount > 0 && (
+                                    <span className="absolute top-1 right-1/4 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
+                                        {pendingQuotesCount > 9 ? '9+' : pendingQuotesCount}
+                                    </span>
+                                )}
                             </button>
                             <button 
                                 onClick={() => setActiveTab('bookings')}
