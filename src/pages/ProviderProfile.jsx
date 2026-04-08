@@ -158,27 +158,11 @@ export default function ProviderProfile() {
                             </div>
                         </div>
                         {/* Contact Buttons */}
-                        <div className="flex flex-col gap-2">
-                            <a
-                                href={`tel:${provider.phone || ''}`}
-                                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105"
-                            >
-                                <Phone className="w-5 h-5" />
-                                Ligar
-                            </a>
-                            <a
-                                href={`https://wa.me/${provider.phone?.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(provider.trade_name || provider.responsible_name)}!%20Vi%20seu%20perfil%20na%20LimpFlix%20e%20gostaria%20de%20um%20orçamento.`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105"
-                            >
-                                <MessageCircle className="w-5 h-5" />
-                                WhatsApp
-                            </a>
+                        <div className="flex flex-col gap-2 w-full md:w-auto">
                             <Link
                                 to={`/solicitar-orcamento?profissional=${provider.id}`}
                                 onClick={handleRequestQuote}
-                                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-semibold transition-all border border-white/20 text-center justify-center"
+                                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold transition-all border border-white/20 text-center justify-center shadow-lg transform hover:scale-105"
                             >
                                 <FileText className="w-5 h-5" />
                                 Solicitar Orçamento
