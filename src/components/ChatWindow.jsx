@@ -149,15 +149,17 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
 
             if (quoteError) throw quoteError
 
-            // 2. Enviar mensagem automática no chat
-            const message = `📄 ORÇAMENTO ENVIADO\nValor: R$ ${parseFloat(quoteAmount).toFixed(2)}\n${quoteDescription ? `Descrição: ${quoteDescription}\n` : ''}\nPara aceitar e agendar, clique no botão que apareceu acima.`
+            // 2. Enviar mensagem automática no chat (MARCADA COMO ORÇAMENTO)
+            const message = `📄 ORÇAMENTO ENVIADO\nValor: R$ ${parseFloat(quoteAmount).toFixed(2)}\n${quoteDescription ? `Descrição: ${quoteDescription}\n` : ''}\nPara aceitar e agendar, clique no botão de aprovação.`
 
             await supabase.from('chat_messages').insert({
                 conversation_id: conversationId,
                 sender_id: user.id,
                 sender_name: isProvider ? (providerData?.trade_name || 'Prestador') : 'Cliente',
                 sender_type: isProvider ? 'provider' : 'client',
-                message: message
+                message: message,
+                is_quote: true,
+                quote_amount: parseFloat(quoteAmount)
             })
 
             // 3. Update last message
@@ -179,6 +181,58 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
             alert('Erro ao enviar orçamento.')
         } finally {
             setSendingQuote(false)
+        }
+    }
+
+    async function approveLatestQuote() {
+        try {
+            // Pegar o orçamento pendente mais recente desta conversa
+            const { data: quote, error: fetchError } = await supabase
+                .from('service_quotes')
+                .select('*')
+                .eq('conversation_id', conversationId)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+            if (fetchError) throw fetchError
+            if (!quote) {
+                alert('Nenhum orçamento pendente encontrado para esta conversa.')
+                return
+            }
+
+            // Aprovar o orçamento (isso dispara o trigger de criação do booking via v24)
+            const { error: updateError } = await supabase
+                .from('service_quotes')
+                .update({ status: 'accepted', updated_at: new Date().toISOString() })
+                .eq('id', quote.id)
+
+            if (updateError) throw updateError
+
+            // Enviar mensagem de confirmação no chat
+            await supabase.from('chat_messages').insert({
+                conversation_id: conversationId,
+                sender_id: user.id,
+                sender_name: 'Cliente',
+                sender_type: 'client',
+                message: '✅ ORÇAMENTO APROVADO! O serviço foi agendado e o pagamento está garantido pela plataforma. Aguarde o profissional no horário combinado.'
+            })
+
+            // Update last message
+            await supabase
+                .from('chat_conversations')
+                .update({
+                    last_message: '✅ Orçamento aprovado!',
+                    last_message_at: new Date().toISOString()
+                })
+                .eq('id', conversationId)
+
+            alert('Orçamento aprovado com sucesso! O profissional foi notificado e o serviço já está na sua agenda.')
+            loadMessages()
+        } catch (err) {
+            console.error('Error approving quote:', err)
+            alert('Erro ao aprovar orçamento.')
         }
     }
 
@@ -325,31 +379,66 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                         <p className="text-gray-400 text-sm">Nenhuma mensagem ainda. Comece a conversa!</p>
                     </div>
                 ) : (
-                    messages.map((msg) => (
-                        <div
-                            key={msg.id}
-                            className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
-                        >
+                    messages.map((msg) => {
+                        const isQuote = msg.is_quote || msg.message?.includes('ORÇAMENTO ENVIADO')
+                        const isOwnMessage = msg.sender_id === user.id
+                        
+                        return (
                             <div
-                                className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${msg.sender_id === user.id
-                                    ? 'bg-green text-white rounded-br-none'
-                                    : 'bg-white text-gray-700 border border-gray-100 rounded-bl-none'
-                                    }`}
+                                key={msg.id}
+                                className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                             >
-                                <p className="whitespace-pre-wrap">{msg.message}</p>
                                 <div
-                                    className={`text-[10px] mt-1 flex items-center gap-1 ${msg.sender_id === user.id ? 'text-white/70' : 'text-gray-400'
-                                        }`}
+                                    className={`max-w-[85%] p-4 rounded-2xl text-sm shadow-sm transition-all ${isOwnMessage
+                                        ? 'bg-green text-white rounded-br-none'
+                                        : 'bg-white text-gray-700 border border-gray-100 rounded-bl-none'
+                                        } ${isQuote ? 'ring-2 ring-navy/10' : ''}`}
                                 >
-                                    <Clock className="w-3 h-3" />
-                                    {new Date(msg.created_at).toLocaleTimeString('pt-BR', {
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    })}
+                                    {isQuote && (
+                                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-navy/10">
+                                            <div className={`p-1.5 rounded-lg ${isOwnMessage ? 'bg-white/20' : 'bg-navy/10'}`}>
+                                                <DollarSign className={`w-4 h-4 ${isOwnMessage ? 'text-white' : 'text-navy'}`} />
+                                            </div>
+                                            <span className="font-black uppercase tracking-wider text-[10px]">Orçamento Profissional</span>
+                                        </div>
+                                    )}
+
+                                    <p className="whitespace-pre-wrap font-medium">{msg.message}</p>
+                                    
+                                    {isQuote && !isOwnMessage && !isProvider && (
+                                        <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-2">
+                                            <p className="text-[10px] text-gray-400 italic mb-1 text-center">
+                                                Ao aprovar, você concorda com os termos de garantia e cancelamento.
+                                            </p>
+                                            <button
+                                                onClick={() => {
+                                                    // Buscamos o ID do orçamento se houver, ou tentamos aprovar o mais recente
+                                                    // Para ser intuitivo, vamos sugerir ir para a aba de aprovação ou implementar aqui
+                                                    window.confirm('Deseja aprovar este orçamento e agendar o serviço? \n\nRegra 70/30: Se você não estiver presente no horário agendado, apenas 70% do valor será estornado.')
+                                                    && approveLatestQuote()
+                                                }}
+                                                className="w-full bg-navy text-white hover:bg-navy-light py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                                            >
+                                                <CheckCircle2 className="w-4 h-4" />
+                                                Aprovar e Agendar Agora
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <div
+                                        className={`text-[10px] mt-2 flex items-center gap-1 ${isOwnMessage ? 'text-white/70' : 'text-gray-400'
+                                            }`}
+                                    >
+                                        <Clock className="w-3 h-3" />
+                                        {new Date(msg.created_at).toLocaleTimeString('pt-BR', {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        )
+                    })
                 )}
                 <div ref={messagesEndRef} />
             </div>
