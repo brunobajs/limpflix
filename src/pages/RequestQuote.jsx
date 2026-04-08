@@ -102,6 +102,28 @@ export default function RequestQuote() {
         setLoading(true)
         setError(null)
         try {
+            // 0. Verify User and Profile (Resilience)
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Usuário não autenticado. Por favor, faça login novamente.')
+
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('id', user.id)
+                .single()
+
+            if (profileError || !profile) {
+                console.log('Perfil não encontrado, criando fallback de cliente...')
+                const { error: createError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: user.id,
+                        full_name: user.user_metadata?.full_name || 'Cliente LimpFlix',
+                        role: 'client'
+                    })
+                if (createError) throw new Error('Não foi possível configurar seu perfil de cliente. Por favor, limpe o cache e tente novamente.')
+            }
+
             // 1. Upload Media to Supabase Storage
             const mediaUrls = []
             for (const file of mediaFiles) {
@@ -110,7 +132,7 @@ export default function RequestQuote() {
                 const filePath = `quotes/${fileName}`
 
                 const { error: uploadError } = await supabase.storage
-                    .from('quote-images') // Reutilizando bucket ou mudando para específico
+                    .from('quote-images') 
                     .upload(filePath, file)
 
                 if (!uploadError) {
@@ -125,7 +147,7 @@ export default function RequestQuote() {
             const { data: quoteRequest, error: quoteError } = await supabase
                 .from('quote_requests')
                 .insert({
-                    client_id: (await supabase.auth.getUser()).data.user?.id,
+                    client_id: user.id,
                     service_category_id: serviceId,
                     description,
                     media_urls: mediaUrls,
@@ -137,7 +159,12 @@ export default function RequestQuote() {
                 .select()
                 .single()
 
-            if (quoteError) throw quoteError
+            if (quoteError) {
+                if (quoteError.code === '23503') {
+                    throw new Error('Erro de permissão: Seu perfil ainda não está totalmente ativo. Tente novamente em alguns segundos.')
+                }
+                throw quoteError
+            }
 
             // 3. Find 3 Nearest Providers via Server-side RPC
             if (!location?.latitude || !location?.longitude) {
