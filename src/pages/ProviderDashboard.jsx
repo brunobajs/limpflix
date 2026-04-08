@@ -62,22 +62,22 @@ class LocalErrorBoundary extends React.Component {
 }
 
 export default function ProviderDashboard() {
-    const { user, loading: authLoading, signOut, refreshProfile } = useAuth()
+    const { user, profile, loading: authLoading, signOut, refreshProfile } = useAuth()
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const { unreadCount } = useUnreadCount(user)
-    const { count: pendingQuotesCount } = usePendingQuotesCount(user, provider)
 
-    // Data
+    // 1. Data & UI State (Moved up to avoid ReferenceError/TDZ)
     const [provider, setProvider] = useState(null)
     const [bookings, setBookings] = useState([])
-
-    // UI State
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('overview')
     const [showWelcome, setShowWelcome] = useState(searchParams.get('welcome') === 'true')
     const [copied, setCopied] = useState(false)
     const [renderError, setRenderError] = useState(null)
+
+    // 2. Notifications Hooks (Depends on state/auth)
+    const { unreadCount } = useUnreadCount(user)
+    const { count: pendingQuotesCount } = usePendingQuotesCount(user, profile, provider?.id)
 
     // Log states to help debug
     console.log('ProviderDashboard State:', { 

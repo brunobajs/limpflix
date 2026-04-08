@@ -94,22 +94,45 @@ export function useUnreadCount(user) {
     return { unreadCount, loading }
 }
 
-export function usePendingQuotesCount(user, profile) {
+export function usePendingQuotesCount(user, profile, providerId = null) {
     const [count, setCount] = useState(0)
     const [loading, setLoading] = useState(true)
 
     const calculateQuotes = useCallback(async () => {
-        if (!user || !profile) return 0
+        if (!user) return 0
 
         try {
-            if (profile.role === 'provider') {
+            // Priority 1: Direct providerId (from dashboard)
+            if (providerId) {
                 const { count: quoteCount } = await supabase
                     .from('service_quotes')
                     .select('*', { count: 'exact', head: true })
-                    .eq('provider_id', profile.id)
+                    .eq('provider_id', providerId)
                     .eq('status', 'pending')
                 return quoteCount || 0
+            }
+
+            // Priority 2: Profile role
+            if (profile?.role === 'provider') {
+                // If we are a provider but don't have the provider_id yet, 
+                // we need to find it (for cases where useAuth profile is used)
+                const { data: providerData } = await supabase
+                    .from('service_providers')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .single()
+
+                if (providerData) {
+                    const { count: quoteCount } = await supabase
+                        .from('service_quotes')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('provider_id', providerData.id)
+                        .eq('status', 'pending')
+                    return quoteCount || 0
+                }
+                return 0
             } else {
+                // Client logic
                 const { count: quoteCount } = await supabase
                     .from('service_quotes')
                     .select('*', { count: 'exact', head: true })
@@ -121,10 +144,10 @@ export function usePendingQuotesCount(user, profile) {
             console.error('Error calculating pending quotes:', err)
             return 0
         }
-    }, [user, profile])
+    }, [user, profile, providerId])
 
     useEffect(() => {
-        if (!user || !profile) {
+        if (!user) {
             setCount(0)
             setLoading(false)
             return
@@ -148,7 +171,7 @@ export function usePendingQuotesCount(user, profile) {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [user, profile, calculateQuotes])
+    }, [user, profile, providerId, calculateQuotes])
 
     return { count, loading }
 }
