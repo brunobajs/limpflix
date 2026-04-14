@@ -232,8 +232,8 @@ export default function Home() {
                     <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green/5 rounded-full blur-3xl"></div>
                 </div>
 
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-10 md:pt-4 md:pb-16">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start text-white">
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-8 md:pt-4 md:pb-12">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8 lg:items-start text-white">
                         <div className="text-left max-w-2xl lg:pt-4">
                             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1.1] mb-4 tracking-tight">
                                 Encontre os <br className="hidden md:block" />
@@ -283,13 +283,13 @@ export default function Home() {
 
                         {/* Image Column */}
                         <div className="relative mt-0 lg:mt-0 order-first lg:order-last">
-                            <div className="relative z-10 w-full max-w-[350px] md:max-w-[400px] lg:max-w-[500px] mx-auto lg:ml-auto lg:-mt-64 transition-all duration-500">
+                            <div className="relative z-10 w-full max-w-[320px] md:max-w-[380px] lg:max-w-[480px] mx-auto lg:ml-auto lg:-mt-72 h-[200px] md:h-[300px] lg:h-[450px] overflow-hidden">
                                 <div className="absolute inset-0 bg-green/5 blur-3xl"></div>
-                                <div className="relative">
+                                <div className="relative h-full">
                                     <img
                                         src="/assets/professional.png"
                                         alt="Boas-vindas LimpFlix"
-                                        className="w-full h-auto object-contain max-h-[250px] md:max-h-[350px] lg:max-h-none"
+                                        className="w-full h-full object-contain object-top"
                                         loading="eager"
                                         onError={(e) => {
                                             e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695ce6958?auto=format&fit=crop&q=80&w=800"
