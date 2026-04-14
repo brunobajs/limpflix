@@ -9,7 +9,7 @@ import {
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
     AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, ChevronLeft, User, Plus, Shield, FileText,
-    BookOpen, Download, ArrowRight, Check, Menu, Bell, FileDown
+    BookOpen, Download, ArrowRight, Check, Menu, Bell, FileDown, Receipt, TrendingDown, TrendingUp as TrendingUpIcon, FileMinus
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
 import ProviderQuotesTab from '../components/ProviderQuotesTab'
@@ -116,6 +116,14 @@ export default function ProviderDashboard() {
     const [transactions, setTransactions] = useState([])
     const [loadingTransactions, setLoadingTransactions] = useState(false)
     const [isWithdrawing, setIsWithdrawing] = useState(false)
+
+    // CRM & Expenses State
+    const [expenses, setExpenses] = useState([])
+    const [showExternalBookingModal, setShowExternalBookingModal] = useState(false)
+    const [externalBookingForm, setExternalBookingForm] = useState({})
+    const [showExpenseModal, setShowExpenseModal] = useState(false)
+    const [expenseForm, setExpenseForm] = useState({ category: 'produtos' })
+    const [financialFilter, setFinancialFilter] = useState('ALL') // 'ALL', 'LIMPFLIX', 'EXTERNAL'
 
     // 1. Initial Data Loading (only when user changes)
     useEffect(() => {
@@ -318,6 +326,19 @@ export default function ProviderDashboard() {
                     .order('created_at', { ascending: false })
 
                 setBookings(bookingData || [])
+                
+                const { data: expensesData, error: expError } = await supabase
+                    .from('provider_expenses')
+                    .select('*')
+                    .eq('provider_id', providerData.id)
+                    .order('expense_date', { ascending: false })
+                
+                if (expError) {
+                    console.error('Info: provider_expenses table might not exist yet.', expError)
+                } else {
+                    setExpenses(expensesData || [])
+                }
+
                 fetchTransactions(providerData.id)
             }
         } catch (err) {
@@ -437,6 +458,72 @@ export default function ProviderDashboard() {
             alert('Erro ao processar saque: ' + err.message)
         } finally {
             setIsWithdrawing(false)
+        }
+    }
+
+    async function handleSaveExternalBooking() {
+        if (!externalBookingForm.client_name || !externalBookingForm.service_name || !externalBookingForm.scheduled_date || !externalBookingForm.total_amount) {
+            return alert('Preencha os campos obrigatórios: Nome, Serviço, Data e Valor.')
+        }
+
+        setIsSaving(true)
+        try {
+            const { error } = await supabase
+                .from('service_bookings')
+                .insert({
+                    provider_id: provider.id,
+                    is_external: true,
+                    external_client_name: externalBookingForm.client_name,
+                    external_client_phone: externalBookingForm.phone,
+                    service_name: externalBookingForm.service_name,
+                    scheduled_date: externalBookingForm.scheduled_date,
+                    scheduled_time: externalBookingForm.scheduled_time || '08:00',
+                    total_amount: parseFloat(externalBookingForm.total_amount),
+                    status: 'confirmed'
+                })
+
+            if (error) throw error
+
+            alert('Atendimento externo salvo com sucesso!')
+            setShowExternalBookingModal(false)
+            setExternalBookingForm({})
+            loadProviderData() // Refresh bookings
+        } catch (err) {
+            console.error('Error saving external booking:', err)
+            alert('Erro ao agendar: ' + err.message)
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    async function handleSaveExpense() {
+        if (!expenseForm.amount || !expenseForm.expense_date || !expenseForm.category) {
+            return alert('Preencha os campos obrigatórios: Data, Valor e Categoria.')
+        }
+
+        setIsSaving(true)
+        try {
+            const { error } = await supabase
+                .from('provider_expenses')
+                .insert({
+                    provider_id: provider.id,
+                    amount: parseFloat(expenseForm.amount),
+                    expense_date: expenseForm.expense_date,
+                    category: expenseForm.category,
+                    description: expenseForm.description || ''
+                })
+
+            if (error) throw error
+
+            alert('Despesa lançada com sucesso!')
+            setShowExpenseModal(false)
+            setExpenseForm({ category: 'produtos' })
+            loadProviderData() // Refresh expenses
+        } catch (err) {
+            console.error('Error saving expense:', err)
+            alert('Erro ao lançar despesa: ' + err.message)
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -560,7 +647,34 @@ export default function ProviderDashboard() {
     }
 
     if (!provider) {
-        return (
+        // Computed Financials
+    const filteredBookingsForFinance = bookings.filter(b => {
+        if (financialFilter === 'ALL') return true;
+        if (financialFilter === 'LIMPFLIX') return !b.is_external;
+        if (financialFilter === 'EXTERNAL') return b.is_external;
+        return true;
+    });
+    
+    // Filtro simplificado apenas para o mês atual selecionado no calendário para uma visualização exata do período, 
+    // ou se quiser ignorar mês e mostrar global (vou mostrar apenas do mês selecionado)
+    const currentMonthBookings = filteredBookingsForFinance.filter(b => {
+        if (!b.scheduled_date) return false;
+        const d = new Date(b.scheduled_date);
+        // workaround timezone
+        return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
+    });
+    
+    const currentMonthExpenses = expenses.filter(e => {
+        if (!e.expense_date) return false;
+        const d = new Date(e.expense_date);
+        return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
+    });
+
+    const totalIncome = currentMonthBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const totalExpenses = currentMonthExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+    const netProfit = totalIncome - totalExpenses;
+
+    return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
                 <h2 className="text-xl font-bold text-gray-700">Nenhum perfil de profissional encontrado</h2>
                 <p className="text-gray-500 text-center">Você precisa se cadastrar como profissional primeiro.</p>
@@ -954,10 +1068,18 @@ export default function ProviderDashboard() {
                     <div className="animate-fade-in grid md:grid-cols-3 gap-6">
                         <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
                             <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                                    <Calendar className="w-5 h-5 text-green" />
-                                    Minha Agenda
-                                </h2>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full mb-8">
+                                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-4 sm:mb-0">
+                                        <Calendar className="w-5 h-5 text-green" />
+                                        Minha Agenda
+                                    </h2>
+                                    <button 
+                                        onClick={() => setShowExternalBookingModal(true)}
+                                        className="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm whitespace-nowrap w-fit shrink-0"
+                                    >
+                                        <Plus className="w-5 h-5" /> Adicionar Cliente (Externo)
+                                    </button>
+                                </div>
                                 <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl p-1 shadow-sm">
                                     <button onClick={prevMonth} className="text-gray-400 hover:text-navy hover:bg-white p-1.5 rounded-lg transition-all">
                                         <ChevronLeft className="w-5 h-5" />
@@ -1072,65 +1194,134 @@ export default function ProviderDashboard() {
                     </div>
                 )}
 
-                {/* Wallet Tab */}
+                {/* Finance Tab */}
                 {activeTab === 'wallet' && (
                     <div className="space-y-6 animate-fade-in">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="bg-gradient-to-br from-green to-emerald-600 rounded-2xl p-6 text-white">
-                                <p className="text-white/70 text-sm mb-1">Total Recebido</p>
-                                <p className="text-3xl font-bold">R$ {(provider.wallet_balance || 0).toFixed(2)}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <TrendingUpIcon className="w-6 h-6 text-green" />
+                                Controle Financeiro
+                            </h2>
+                            <div className="flex items-center gap-2 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+                                <button onClick={() => setFinancialFilter('ALL')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${financialFilter === 'ALL' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Todos</button>
+                                <button onClick={() => setFinancialFilter('LIMPFLIX')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${financialFilter === 'LIMPFLIX' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50'}`}>App LimpFlix</button>
+                                <button onClick={() => setFinancialFilter('EXTERNAL')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${financialFilter === 'EXTERNAL' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Externos</button>
                             </div>
-                            <div className="bg-gradient-to-br from-navy to-navy-light rounded-2xl p-6 text-white">
-                                <p className="text-white/70 text-sm mb-1">Em Processamento</p>
-                                <p className="text-3xl font-bold">R$ {(provider.pending_balance || 0).toFixed(2)}</p>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-none sm:rounded-xl p-3 shadow-sm w-full sm:w-fit mx-auto sm:mx-0">
+                            <button onClick={prevMonth} className="text-gray-400 hover:text-navy p-1.5 rounded-lg transition-all">
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <span className="font-bold text-gray-800 capitalize w-40 text-center text-sm">
+                                {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                            </span>
+                            <button onClick={nextMonth} className="text-gray-400 hover:text-navy p-1.5 rounded-lg transition-all">
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg shadow-blue-600/20">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-white/80 text-sm font-medium">Receitas Totais</p>
+                                    <Plus className="w-5 h-5 text-white/80" />
+                                </div>
+                                <p className="text-3xl font-black">R$ {totalIncome.toFixed(2)}</p>
+                                <p className="text-xs text-white/60 mt-1 uppercase tracking-wider font-bold">{currentMonthBookings.length} serviços realizados/agendados</p>
+                            </div>
+                            
+                            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-lg shadow-red-500/20">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-white/80 text-sm font-medium">Despesas & Custos</p>
+                                    <TrendingDown className="w-5 h-5 text-white/80" />
+                                </div>
+                                <p className="text-3xl font-black">R$ {totalExpenses.toFixed(2)}</p>
+                                <p className="text-xs text-white/60 mt-1 uppercase tracking-wider font-bold">{currentMonthExpenses.length} lançamentos efetuados</p>
+                            </div>
+
+                            <div className={`bg-gradient-to-br rounded-2xl p-6 text-white shadow-lg ${netProfit >= 0 ? 'from-green to-emerald-700 shadow-green/20' : 'from-amber-500 to-orange-600 shadow-amber-500/20'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-white/80 text-sm font-medium">Lucro Líquido</p>
+                                    <Receipt className="w-5 h-5 text-white/80" />
+                                </div>
+                                <p className="text-3xl font-black">R$ {netProfit.toFixed(2)}</p>
+                                <p className="text-xs text-white/80 mt-1 uppercase tracking-wider font-bold">Saldo real do mês</p>
+                            </div>
+                        </div>
+
+                        {/* Split views: Receipts list vs Expenses list */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-96">
+                                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-blue-500" /> Histórico de Receitas
+                                </h3>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                                    {currentMonthBookings.length === 0 ? (
+                                        <div className="text-center py-8 text-gray-400 text-sm">Nenhum serviço neste mês.</div>
+                                    ) : (
+                                        currentMonthBookings.map(b => (
+                                            <div key={b.id} className="p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors flex justify-between items-center">
+                                                <div>
+                                                    <p className="text-sm font-bold text-gray-900">{b.client_name || b.external_client_name || 'Cliente Sem Nome'}</p>
+                                                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                        {b.is_external ? <Building2 className="w-3 h-3 text-amber-500" /> : <Award className="w-3 h-3 text-green" />}
+                                                        {b.is_external ? 'Atendimento Externo' : 'Serviço LimpFlix'} • {new Date(b.scheduled_date).toLocaleDateString('pt-BR')}
+                                                    </p>
+                                                </div>
+                                                <p className="text-sm font-bold text-blue-600">+ R$ {(b.total_amount || 0).toFixed(2)}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-96">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                                        <FileMinus className="w-5 h-5 text-red-500" /> Despesas Lançadas
+                                    </h3>
+                                    <button 
+                                        onClick={() => setShowExpenseModal(true)}
+                                        className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                                    >
+                                        <Plus className="w-3 h-3" /> Lançar Custo
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                                    {currentMonthExpenses.length === 0 ? (
+                                        <div className="text-center py-8 text-gray-400 text-sm">Nenhuma despesa lançada neste mês.</div>
+                                    ) : (
+                                        currentMonthExpenses.map(e => (
+                                            <div key={e.id} className="p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors flex justify-between items-center">
+                                                <div>
+                                                    <p className="text-sm font-bold text-gray-900 capitalize">{e.category}</p>
+                                                    <p className="text-xs text-gray-400">{new Date(e.expense_date).toLocaleDateString('pt-BR')} {e.description ? `• ${e.description}` : ''}</p>
+                                                </div>
+                                                <p className="text-sm font-bold text-red-500">- R$ {(e.amount || 0).toFixed(2)}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
                         
-                        <div className="bg-green/10 border border-green/20 rounded-2xl p-6">
+                        {/* Payout Info (Kept from wallet) */}
+                        <div className="bg-green/10 border border-green/20 rounded-2xl p-6 mt-6">
                             <div className="flex items-start gap-3">
                                 <div className="w-10 h-10 bg-green rounded-full flex items-center justify-center flex-shrink-0">
                                     <DollarSign className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-green-800 mb-1">Pagamento Automático</h3>
+                                    <h3 className="font-bold text-green-800 mb-1">Repasses LimpFlix (Saldo: R$ {(provider.wallet_balance || 0).toFixed(2)})</h3>
                                     <p className="text-sm text-green-700">
-                                        O pagamento é feito automaticamente via PIX após a conclusão do serviço. 
-                                        Não é necessário solicitar saque - o valor cai direto na sua conta em até 2 dias úteis.
+                                        Seus serviços realizados através do App garantem pagamento automático via PIX. 
+                                        Seu saldo será transferido diretamente para a sua conta cadastrada após a conclusão e carência de garantia.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                            <h3 className="font-bold text-gray-900 mb-4">Histórico de Recebimentos</h3>
-                            {loadingTransactions ? (
-                                <div className="flex justify-center py-8">
-                                    <Loader2 className="w-8 h-8 text-green animate-spin" />
-                                </div>
-                            ) : transactions.length === 0 ? (
-                                <div className="text-center py-8">
-                                    <Clock className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                                    <p className="text-gray-500">Nenhuma transação registrada ainda.</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-gray-50">
-                                    {transactions.map((tx) => (
-                                        <div key={tx.id} className="py-4 flex items-center justify-between">
-                                            <div>
-                                                <p className="font-medium text-gray-900">{tx.description || (tx.type === 'incoming' ? 'Pagamento Recebido' : 'Saque Realizado')}</p>
-                                                <p className="text-xs text-gray-500">{new Date(tx.created_at).toLocaleDateString('pt-BR')} às {new Date(tx.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                                            </div>
-                                            <div className={`text-right ${tx.type === 'incoming' ? 'text-green' : 'text-navy'}`}>
-                                                <p className="font-bold">{tx.type === 'incoming' ? '+' : '-'} R$ {tx.amount.toFixed(2)}</p>
-                                                <p className="text-[10px] uppercase tracking-wider font-bold opacity-60">
-                                                    {tx.status === 'completed' ? 'Concluído' : tx.status === 'pending' ? 'Em processamento' : 'Falhou'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                     </div>
                 )}
 
@@ -1562,8 +1753,118 @@ export default function ProviderDashboard() {
                             </div>
                         </div>
                     </div>
+                    </div>
                 )}
             </div>
+
+            {/* External Booking Modal */}
+            {showExternalBookingModal && (
+                <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 shrink-0">
+                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-green" /> Adicionar Cliente (Externo)
+                            </h2>
+                            <button onClick={() => setShowExternalBookingModal(false)} className="text-gray-400 hover:text-gray-600 bg-white shadow-sm p-1.5 rounded-full hover:bg-gray-100 border border-gray-100 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto w-full">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nome do Cliente *</label>
+                                <input type="text" value={externalBookingForm.client_name || ''} onChange={e => setExternalBookingForm({...externalBookingForm, client_name: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green/50 w-full" placeholder="Ex: Maria Silva" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Telefone (opcional)</label>
+                                <input type="text" value={externalBookingForm.phone || ''} onChange={e => setExternalBookingForm({...externalBookingForm, phone: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green/50 w-full" placeholder="(00) 00000-0000" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Serviço Prestado *</label>
+                                <select value={externalBookingForm.service_name || ''} onChange={e => setExternalBookingForm({...externalBookingForm, service_name: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green/50 w-full bg-white">
+                                    <option value="">Selecione um serviço...</option>
+                                    {SERVICE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Data *</label>
+                                    <input type="date" value={externalBookingForm.scheduled_date || ''} onChange={e => setExternalBookingForm({...externalBookingForm, scheduled_date: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green/50 w-full" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Hora *</label>
+                                    <input type="time" value={externalBookingForm.scheduled_time || ''} onChange={e => setExternalBookingForm({...externalBookingForm, scheduled_time: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green/50 w-full" />
+                                </div>
+                            </div>
+                            <div className="flex-1 w-full shrink-0">
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Valor Cobrado (R$) *</label>
+                                <div className="relative flex w-full items-center max-w-full">
+                                    <span className="absolute left-4 text-gray-500 font-bold shrink-0">R$</span>
+                                    <input type="number" step="0.01" value={externalBookingForm.total_amount || ''} onChange={e => setExternalBookingForm({...externalBookingForm, total_amount: e.target.value})} className="w-full pl-12 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green/50 w-full" placeholder="0.00" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 sm:p-6 border-t border-gray-100 bg-gray-50 mt-auto shrink-0">
+                            <button disabled={isSaving} onClick={handleSaveExternalBooking} className="w-full bg-green text-white font-bold py-3 rounded-xl hover:bg-green-dark transition-colors disabled:opacity-50">
+                                {isSaving ? 'Salvando...' : 'Adicionar à Agenda'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Expense Modal */}
+            {showExpenseModal && (
+                <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 shrink-0">
+                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <FileMinus className="w-5 h-5 text-red-500" /> Lançar Custo Diário
+                            </h2>
+                            <button onClick={() => setShowExpenseModal(false)} className="text-gray-400 hover:text-gray-600 bg-white shadow-sm p-1.5 rounded-full hover:bg-gray-100 border border-gray-100 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto w-full">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Categoria *</label>
+                                <select value={expenseForm.category || 'produtos'} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 w-full bg-white">
+                                    <option value="produtos">Produtos de Limpeza</option>
+                                    <option value="alimentacao">Alimentação</option>
+                                    <option value="combustivel">Combustível</option>
+                                    <option value="pedagio">Pedágio</option>
+                                    <option value="manutencao_veiculo">Manutenção de Veículo</option>
+                                    <option value="manutencao_maquina">Manutenção de Máquinas/Extratora</option>
+                                    <option value="outros">Outros Custos</option>
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="flex-1 w-full shrink-0">
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Data *</label>
+                                    <input type="date" value={expenseForm.expense_date || new Date().toISOString().split('T')[0]} onChange={e => setExpenseForm({...expenseForm, expense_date: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 w-full" />
+                                </div>
+                                <div className="flex-1 w-full shrink-0">
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Valor (R$) *</label>
+                                    <div className="relative flex w-full items-center max-w-full">
+                                        <span className="absolute left-4 text-gray-500 font-bold shrink-0">R$</span>
+                                        <input type="number" step="0.01" value={expenseForm.amount || ''} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} className="w-full pl-12 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 w-full" placeholder="0.00" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Descrição (opcional)</label>
+                                <input type="text" value={expenseForm.description || ''} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 w-full" placeholder="Ex: Almoço Cliente Centro" />
+                            </div>
+                        </div>
+                        <div className="p-4 sm:p-6 border-t border-gray-100 bg-gray-50 mt-auto shrink-0">
+                            <button disabled={isSaving} onClick={handleSaveExpense} className="w-full bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50">
+                                {isSaving ? 'Lançando...' : 'Confirmar Custo'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
         </LocalErrorBoundary>
     )
