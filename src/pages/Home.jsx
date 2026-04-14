@@ -251,7 +251,7 @@ export default function Home() {
                                     to="/profissionais"
                                     className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-green hover:bg-green-dark text-white px-10 py-4 rounded-2xl text-xl font-black transition-all hover:scale-105 shadow-xl shadow-green/40 group"
                                 >
-                                    Limpar Agora
+                                    Pedir orçamento gratuito
                                     <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                                 </Link>
                                 <div className="flex flex-col items-center sm:items-start">
