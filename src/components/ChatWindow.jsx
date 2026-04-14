@@ -19,6 +19,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
     const [sendingQuote, setSendingQuote] = useState(false)
     const messagesEndRef = useRef(null)
 
+    const [quotes, setQuotes] = useState([])
     const [quoteRequest, setQuoteRequest] = useState(null)
     const [showMedia, setShowMedia] = useState(true)
     const notificationSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'))
@@ -28,6 +29,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
 
         loadMessages()
         loadQuoteRequest()
+        loadQuotes()
 
         // Subscribe to real-time messages
         const channel = supabase
@@ -73,6 +75,15 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
             }
         } catch (err) {
             console.error('Error loading quote request:', err)
+        }
+    }
+
+    async function loadQuotes() {
+        try {
+            const { data } = await supabase.from('service_quotes').select('*').eq('conversation_id', conversationId)
+            if (data) setQuotes(data)
+        } catch (err) {
+            console.error('Error loading quotes:', err)
         }
     }
 
@@ -175,6 +186,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
             setQuoteAmount('')
             setQuoteDescription('')
             alert('Orçamento enviado com sucesso!')
+            loadQuotes()
 
         } catch (err) {
             console.error('Error sending quote:', err)
@@ -230,6 +242,7 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
 
             alert('Orçamento aprovado com sucesso! O profissional foi notificado e o serviço já está na sua agenda.')
             loadMessages()
+            loadQuotes()
         } catch (err) {
             console.error('Error approving quote:', err)
             alert('Erro ao aprovar orçamento.')
@@ -315,15 +328,6 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    {isProvider && (
-                        <button
-                            onClick={() => setShowQuoteModal(true)}
-                            className="bg-navy hover:bg-navy-light text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
-                        >
-                            <DollarSign className="w-3.5 h-3.5" />
-                            Enviar Orçamento
-                        </button>
-                    )}
                     <button
                         onClick={handleDeleteConversation}
                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
@@ -378,10 +382,14 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                     <div className="text-center py-8">
                         <p className="text-gray-400 text-sm">Nenhuma mensagem ainda. Comece a conversa!</p>
                     </div>
-                ) : (
-                    messages.map((msg) => {
+                ) : (() => {
+                    const latestQuoteMsgId = [...messages].reverse().find(m => m.is_quote || m.message?.includes('ORÇAMENTO ENVIADO'))?.id;
+                    const hasAcceptedQuote = quotes.some(q => q.status === 'accepted');
+
+                    return messages.map((msg) => {
                         const isQuote = msg.is_quote || msg.message?.includes('ORÇAMENTO ENVIADO')
                         const isOwnMessage = msg.sender_id === user.id
+                        const isLatestQuote = msg.id === latestQuoteMsgId
                         
                         return (
                             <div
@@ -405,23 +413,34 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
 
                                     <p className="whitespace-pre-wrap font-medium">{msg.message}</p>
                                     
-                                    {isQuote && !isOwnMessage && !isProvider && (
-                                        <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-2">
-                                            <p className="text-[10px] text-gray-400 italic mb-1 text-center">
-                                                Ao aprovar, você concorda com os termos de garantia e cancelamento.
-                                            </p>
-                                            <button
-                                                onClick={() => {
-                                                    // Buscamos o ID do orçamento se houver, ou tentamos aprovar o mais recente
-                                                    // Para ser intuitivo, vamos sugerir ir para a aba de aprovação ou implementar aqui
-                                                    window.confirm('Deseja aprovar este orçamento e agendar o serviço? \n\nRegra 70/30: Se você não estiver presente no horário agendado, apenas 70% do valor será estornado.')
-                                                    && approveLatestQuote()
-                                                }}
-                                                className="w-full bg-navy text-white hover:bg-navy-light py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
-                                            >
-                                                <CheckCircle2 className="w-4 h-4" />
-                                                Aprovar e Agendar Agora
-                                            </button>
+                                    {isQuote && (
+                                        <div className={`mt-3 pt-3 border-t ${isOwnMessage ? 'border-white/20' : 'border-gray-100'} flex flex-col gap-2`}>
+                                            {hasAcceptedQuote ? (
+                                                <div className="bg-green/10 text-green px-3 py-2 rounded-lg text-center font-bold text-xs flex items-center justify-center gap-1 mt-1">
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                    Serviço Agendado!
+                                                </div>
+                                            ) : !isOwnMessage && !isProvider && isLatestQuote ? (
+                                                <>
+                                                    <p className="text-[10px] text-gray-400 italic mb-1 text-center">
+                                                        Ao aprovar, você concorda com os termos de garantia e cancelamento.
+                                                    </p>
+                                                    <button
+                                                        onClick={() => {
+                                                            window.confirm('Deseja aprovar este orçamento e agendar o serviço? \n\nRegra 70/30: Se você não estiver presente no horário agendado, apenas 70% do valor será estornado.')
+                                                            && approveLatestQuote()
+                                                        }}
+                                                        className="w-full bg-navy text-white hover:bg-navy-light py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                                                    >
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                        Aprovar e Agendar Agora
+                                                    </button>
+                                                </>
+                                            ) : !isOwnMessage && !isProvider && !isLatestQuote ? (
+                                                <div className="text-center text-xs text-gray-400">Novo orçamento enviado abaixo</div>
+                                            ) : isOwnMessage && isProvider ? (
+                                                <div className="text-center text-xs bg-black/10 py-1.5 rounded-lg font-medium opacity-80">Aguardando resposta do cliente...</div>
+                                            ) : null}
                                         </div>
                                     )}
 
@@ -439,12 +458,23 @@ export default function ChatWindow({ conversationId, otherPartyName }) {
                             </div>
                         )
                     })
-                )}
+                })()}
                 <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-white border-t border-gray-100">
+            <div className="p-4 bg-white border-t border-gray-100 flex flex-col gap-3">
+                {isProvider && !quotes.some(q => q.status === 'accepted') && (
+                    <div className="flex items-center justify-start">
+                        <button
+                            onClick={() => setShowQuoteModal(true)}
+                            className="bg-navy/10 text-navy hover:bg-navy/20 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all"
+                        >
+                            <DollarSign className="w-4 h-4" />
+                            Enviar Novo Orçamento
+                        </button>
+                    </div>
+                )}
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                     <button
                         type="button"
