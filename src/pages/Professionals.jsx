@@ -12,11 +12,16 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
 // Fix for Leaflet marker icons
+// Fix for Leaflet marker icons in Vite
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconRetinaUrl: markerIcon2x,
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
 });
 
 const SERVICE_OPTIONS = [
@@ -327,31 +332,37 @@ export default function Professionals() {
                                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                             />
-                            {userLocation && (
-                                <Marker position={[userLocation.latitude, userLocation.longitude]}>
+                            {userLocation && !isNaN(Number(userLocation.latitude)) && !isNaN(Number(userLocation.longitude)) && (
+                                <Marker position={[Number(userLocation.latitude), Number(userLocation.longitude)]}>
                                     <Popup>Você está aqui</Popup>
                                 </Marker>
                             )}
-                            {filtered.map(p => p.latitude && p.longitude && (
-                                <Marker key={p.id} position={[Number(p.latitude), Number(p.longitude)]}>
-                                    <Popup>
-                                        <div className="p-1 min-w-[150px]">
-                                            <h4 className="font-bold text-navy mb-1">{p.trade_name || p.responsible_name}</h4>
-                                            <p className="text-xs text-gray-500 mb-2">{p.city}, {p.state}</p>
-                                            <div className="flex items-center gap-1 mb-2">
-                                                <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                                <span className="text-xs font-bold">{p.rating || '5.0'}</span>
+                            {filtered.map(p => {
+                                const lat = Number(p.latitude)
+                                const lng = Number(p.longitude)
+                                if (isNaN(lat) || isNaN(lng)) return null
+                                
+                                return (
+                                    <Marker key={p.id} position={[lat, lng]}>
+                                        <Popup>
+                                            <div className="p-1 min-w-[150px]">
+                                                <h4 className="font-bold text-navy mb-1">{p.trade_name || p.responsible_name}</h4>
+                                                <p className="text-xs text-gray-500 mb-2">{p.city}, {p.state}</p>
+                                                <div className="flex items-center gap-1 mb-2">
+                                                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                                    <span className="text-xs font-bold">{p.rating || '5.0'}</span>
+                                                </div>
+                                                <Link
+                                                    to={`/profissional/${p.id}`}
+                                                    className="block text-center bg-green text-white text-[10px] font-bold py-1.5 rounded-lg hover:bg-green-dark transition-colors"
+                                                >
+                                                    Ver Perfil
+                                                </Link>
                                             </div>
-                                            <Link
-                                                to={`/profissional/${p.id}`}
-                                                className="block text-center bg-green text-white text-[10px] font-bold py-1.5 rounded-lg hover:bg-green-dark transition-colors"
-                                            >
-                                                Ver Perfil
-                                            </Link>
-                                        </div>
-                                    </Popup>
-                                </Marker>
-                            ))}
+                                        </Popup>
+                                    </Marker>
+                                )
+                            })}
                             <MapUpdater center={updaterCenter} />
                         </MapContainer>
                     </div>
