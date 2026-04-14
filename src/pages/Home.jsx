@@ -283,9 +283,9 @@ export default function Home() {
 
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
-                            <div className="relative z-10 w-full max-w-[500px] ml-auto lg:-mt-40 h-[480px] overflow-hidden">
+                            <div className="relative z-10 w-full max-w-[500px] ml-auto lg:-mt-36 h-[510px] overflow-hidden">
                                 <div className="absolute inset-0 bg-green/5 blur-3xl"></div>
-                                <div className="relative h-[850px] -mt-10">
+                                <div className="relative h-[850px] -mt-10 scale-105 transition-transform duration-700">
                                     <img
                                         src="/assets/professional.png"
                                         alt="Boas-vindas LimpFlix"
@@ -328,6 +328,8 @@ export default function Home() {
                                         src={service.image}
                                         alt={service.name}
                                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                        loading="lazy"
+                                        decoding="async"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/60 to-transparent"></div>
                                 </div>
