@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { getCurrentPosition, sortByDistance } from '../lib/geo'
@@ -43,6 +43,7 @@ const SLUG_TO_SERVICE = {
 
 export default function Professionals() {
     const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
     const { profile } = useAuth()
     const [providers, setProviders] = useState([])
     const [loading, setLoading] = useState(true)
@@ -158,12 +159,22 @@ export default function Professionals() {
     if (userLocation && sortBy === 'distance') {
         filtered = sortByDistance(filtered, userLocation.latitude, userLocation.longitude)
     } else if (sortBy === 'rating') {
-        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        filtered.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0))
     } else if (sortBy === 'reviews') {
-        filtered.sort((a, b) => (b.total_reviews || 0) - (a.total_reviews || 0))
+        filtered.sort((a, b) => (Number(b.total_reviews) || 0) - (Number(a.total_reviews) || 0))
     }
 
-    const cities = [...new Set(providers.map(p => p.city).filter(Boolean))].sort()
+    const cities = useMemo(() => {
+        return [...new Set(providers.map(p => p.city).filter(Boolean))].sort()
+    }, [providers])
+
+    const mapCenter = useMemo(() => {
+        return userLocation ? [Number(userLocation.latitude), Number(userLocation.longitude)] : [-23.5505, -46.6333]
+    }, [userLocation])
+
+    const updaterCenter = useMemo(() => {
+        return userLocation ? [Number(userLocation.latitude), Number(userLocation.longitude)] : null
+    }, [userLocation])
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -308,7 +319,7 @@ export default function Professionals() {
                 ) : (
                     <div className="h-[600px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm animate-fade-in z-0 sticky top-20">
                         <MapContainer
-                            center={userLocation ? [userLocation.latitude, userLocation.longitude] : [-23.5505, -46.6333]}
+                            center={mapCenter}
                             zoom={11}
                             style={{ height: '100%', width: '100%' }}
                         >
@@ -322,7 +333,7 @@ export default function Professionals() {
                                 </Marker>
                             )}
                             {filtered.map(p => p.latitude && p.longitude && (
-                                <Marker key={p.id} position={[p.latitude, p.longitude]}>
+                                <Marker key={p.id} position={[Number(p.latitude), Number(p.longitude)]}>
                                     <Popup>
                                         <div className="p-1 min-w-[150px]">
                                             <h4 className="font-bold text-navy mb-1">{p.trade_name || p.responsible_name}</h4>
@@ -341,7 +352,7 @@ export default function Professionals() {
                                     </Popup>
                                 </Marker>
                             ))}
-                            <MapUpdater center={userLocation ? [userLocation.latitude, userLocation.longitude] : null} />
+                            <MapUpdater center={updaterCenter} />
                         </MapContainer>
                     </div>
                 )}
