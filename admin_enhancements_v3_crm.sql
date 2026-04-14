@@ -1,4 +1,4 @@
--- LimpFlix - V3 CRM & Expenses Migration Script
+-- LimpFlix - V3 CRM & Expenses Migration Script (FIXED)
 -- Objective: Add external booking support and expense tracking for service providers.
 
 -- 1. Modify service_bookings to support external bookings
@@ -6,9 +6,10 @@ ALTER TABLE public.service_bookings ADD COLUMN IF NOT EXISTS is_external BOOLEAN
 ALTER TABLE public.service_bookings ADD COLUMN IF NOT EXISTS external_client_name TEXT;
 ALTER TABLE public.service_bookings ADD COLUMN IF NOT EXISTS external_client_phone TEXT;
 
--- Make client_id nullable because external bookings won't have a linked registered user
+-- Note: client_id and quote_id are already nullable in the original schema.
+-- But we ensure they can be null for external bookings just in case.
 ALTER TABLE public.service_bookings ALTER COLUMN client_id DROP NOT NULL;
-ALTER TABLE public.service_bookings ALTER COLUMN quote_request_id DROP NOT NULL;
+ALTER TABLE public.service_bookings ALTER COLUMN quote_id DROP NOT NULL;
 
 -- 2. Create provider_expenses table
 CREATE TABLE IF NOT EXISTS public.provider_expenses (
