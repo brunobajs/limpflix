@@ -232,30 +232,30 @@ export default function Home() {
                     <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green/5 rounded-full blur-3xl"></div>
                 </div>
 
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 md:pt-6 md:pb-12">
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-6 md:pt-4 md:pb-10">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:items-start text-white">
                         <div className="text-left max-w-2xl lg:pt-2">
-                            <h1 className="text-4xl md:text-5xl lg:text-7xl font-black text-white leading-[1.05] mb-4 tracking-tight">
+                            <h1 className="text-3xl md:text-5xl lg:text-7xl font-black text-white leading-[1.0] mb-3 tracking-tight">
                                 Encontre os <br className="hidden md:block" />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#39FF14] via-green to-emerald-400">
                                     Melhores Profissionais
                                 </span><br className="hidden md:block" />
                                 da Sua Região
                             </h1>
-                            <p className="text-lg md:text-xl lg:text-2xl text-white/80 mb-6 md:mb-8 font-light leading-relaxed max-w-xl">
+                            <p className="text-base md:text-lg lg:text-2xl text-white/80 mb-4 md:mb-6 font-light leading-relaxed max-w-xl">
                                 Conectamos você com especialistas verificados para <span className="text-white font-medium italic">todo tipo de limpeza</span>.
                                 Agende em minutos.
                             </p>
                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <Link
                                     to="/profissionais"
-                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-green hover:bg-green-dark text-white px-10 py-4 lg:py-4.5 rounded-2xl text-xl font-black transition-all hover:scale-105 shadow-xl shadow-green/40 group"
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-green hover:bg-green-dark text-white px-8 md:px-10 py-3.5 md:py-4 rounded-2xl text-lg md:text-xl font-black transition-all hover:scale-105 shadow-xl shadow-green/40 group"
                                 >
                                     Pedir orçamento gratuito
-                                    <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                                    <ArrowRight className="w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-1 transition-transform" />
                                 </Link>
                                 <div className="flex flex-col items-center sm:items-start">
-                                    <div className="flex items-center gap-2 text-white/60 text-sm mb-1">
+                                    <div className="flex items-center gap-2 text-white/60 text-sm mb-0.5">
                                         <CheckCircle2 className="w-4 h-4 text-green" />
                                         <span>Cadastro Gratuito</span>
                                     </div>
@@ -265,27 +265,27 @@ export default function Home() {
                                 </div>
                             </div>
                             {/* Stats */}
-                            <div className="grid grid-cols-3 gap-6 mt-10 md:mt-12 max-w-lg">
+                            <div className="grid grid-cols-3 gap-6 mt-8 md:mt-10 max-w-lg">
                                 <div>
                                     <div className="text-2xl md:text-3xl font-bold text-green">500+</div>
-                                    <div className="text-white/50 text-[10px] md:text-xs mt-1 uppercase tracking-wider">Profissionais</div>
+                                    <div className="text-white/50 text-[10px] md:text-xs mt-0.5 uppercase tracking-wider">Profissionais</div>
                                 </div>
                                 <div>
                                     <div className="text-2xl md:text-3xl font-bold text-green">11</div>
-                                    <div className="text-white/50 text-[10px] md:text-xs mt-1 uppercase tracking-wider">Serviços</div>
+                                    <div className="text-white/50 text-[10px] md:text-xs mt-0.5 uppercase tracking-wider">Serviços</div>
                                 </div>
                                 <div>
                                     <div className="text-2xl md:text-3xl font-bold text-green">4.9</div>
-                                    <div className="text-white/50 text-[10px] md:text-xs mt-1 uppercase tracking-wider">Avaliação</div>
+                                    <div className="text-white/50 text-[10px] md:text-xs mt-0.5 uppercase tracking-wider">Avaliação</div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
-                            <div className="relative z-10 w-full max-w-[500px] ml-auto lg:-mt-32 h-[410px] overflow-hidden">
+                            <div className="relative z-10 w-full max-w-[500px] ml-auto lg:-mt-40 h-[480px] overflow-hidden">
                                 <div className="absolute inset-0 bg-green/5 blur-3xl"></div>
-                                <div className="relative h-[800px] -mt-10">
+                                <div className="relative h-[850px] -mt-10">
                                     <img
                                         src="/assets/professional.png"
                                         alt="Boas-vindas LimpFlix"
