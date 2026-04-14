@@ -71,8 +71,8 @@ export function AuthProvider({ children }) {
         await loadProfile(user.id)
     }
 
-    async function signUp(email, password, fullName, referralCode = null) {
-        const metadata = { full_name: fullName };
+    async function signUp(email, password, fullName, city, referralCode = null) {
+        const metadata = { full_name: fullName, city };
         if (referralCode && referralCode.trim() !== '') {
             metadata.referred_by_code = referralCode.trim();
         }

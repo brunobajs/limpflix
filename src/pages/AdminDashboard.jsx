@@ -32,6 +32,7 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('overview')
     const [adminProviders, setAdminProviders] = useState([])
     const [quotes, setQuotes] = useState([])
+    const [pendingQuotes, setPendingQuotes] = useState([])
     const [conversations, setConversations] = useState([])
     const [allClients, setAllClients] = useState([])
 
@@ -123,6 +124,30 @@ export default function AdminDashboard() {
                 .order('created_at', { ascending: false })
             setQuotes(quotesData || [])
 
+            // 5.5. Load all pending quote requests (requests with no quotes yet)
+            const { data: pendingReqsData } = await supabase
+                .from('quote_requests')
+                .select(`
+                    *,
+                    profiles:client_id (full_name),
+                    service_categories (name)
+                `)
+                .eq('status', 'open')
+                .order('created_at', { ascending: false })
+            
+            // Filter out those that already got a quote (using JS for simplicity or we can just show all open requests)
+            if (pendingReqsData) {
+                // If service_quotes have quote_request_id, we can filter.
+                // Assuming service_quotes has quote_request_id, but the query above might not easily join it.
+                // We'll fetch all service_quotes quote_request_ids to filter.
+                const { data: squotesData } = await supabase.from('service_quotes').select('quote_request_id').not('quote_request_id', 'is', null)
+                const quotedReqIds = new Set(squotesData?.map(q => q.quote_request_id) || [])
+                const noQuotesYet = pendingReqsData.filter(req => !quotedReqIds.has(req.id))
+                setPendingQuotes(noQuotesYet)
+            } else {
+                setPendingQuotes([])
+            }
+
             // 6. Load all conversations
             const { data: conversationsData } = await supabase
                 .from('chat_conversations')
@@ -181,7 +206,8 @@ export default function AdminDashboard() {
                         { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
                         { id: 'clients', label: 'Clientes', icon: Users },
                         { id: 'providers', label: 'Prestadores', icon: Building2 },
-                        { id: 'quotes', label: 'Orçamentos', icon: FileText },
+                        { id: 'pending_quotes', label: 'Orçamentos Pendentes', icon: AlertTriangle },
+                        { id: 'quotes', label: 'Orçamentos (Propostas)', icon: FileText },
                         { id: 'conversations', label: 'Conversas', icon: MessageSquare },
                         { id: 'cities', label: 'Cidades', icon: MapPin },
                         { id: 'marketing', label: 'Financeiro', icon: Wallet },
@@ -212,8 +238,9 @@ export default function AdminDashboard() {
                     <h1 className="text-xl font-bold text-gray-800">
                         {activeTab === 'overview' && 'Dashboard Geral'}
                         {activeTab === 'providers' && 'Gestão de Prestadores'}
-                        {activeTab === 'clients' && 'Lista de Clientes'}
-                        {activeTab === 'quotes' && 'Orçamentos'}
+                        { activeTab === 'clients' && 'Lista de Clientes' }
+                        { activeTab === 'pending_quotes' && 'Orçamentos Pendentes' }
+                        { activeTab === 'quotes' && 'Propostas Enviadas' }
                         {activeTab === 'conversations' && 'Conversas'}
                         {activeTab === 'cities' && 'Distribuição Geográfica'}
                         {activeTab === 'marketing' && 'Financeiro'}
@@ -411,6 +438,7 @@ export default function AdminDashboard() {
                                     <thead className="bg-gray-50/50">
                                         <tr className="text-gray-400 text-[10px] uppercase font-black tracking-wider">
                                             <th className="px-6 py-4">Nome</th>
+                                            <th className="px-6 py-4">Cidade</th>
                                             <th className="px-6 py-4">Email</th>
                                             <th className="px-6 py-4">Data de Cadastro</th>
                                         </tr>
@@ -418,7 +446,7 @@ export default function AdminDashboard() {
                                     <tbody className="divide-y divide-gray-50">
                                         {allClients.length === 0 ? (
                                             <tr>
-                                                <td colSpan={3} className="px-6 py-8 text-center text-gray-400">Nenhum cliente cadastrado</td>
+                                                <td colSpan={4} className="px-6 py-8 text-center text-gray-400">Nenhum cliente cadastrado</td>
                                             </tr>
                                         ) : allClients.map(client => (
                                             <tr key={client.id} className="hover:bg-gray-50/80 transition-colors">
@@ -430,8 +458,65 @@ export default function AdminDashboard() {
                                                         <p className="text-sm font-bold text-gray-900">{client.full_name || 'Sem nome'}</p>
                                                     </div>
                                                 </td>
+                                                <td className="px-6 py-4 text-sm text-gray-900 font-bold">{client.city || 'N/A'}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-600">{client.email || 'Email não disponível'}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-500">{new Date(client.created_at).toLocaleDateString('pt-BR')}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'pending_quotes' && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-gray-900">Pedidos de Orçamento Pendentes</h2>
+                                <span className="text-xs font-bold text-amber-500 uppercase flex items-center gap-1">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    {pendingQuotes.length} AGUARDANDO PRESTADOR
+                                </span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50/50">
+                                        <tr className="text-gray-400 text-[10px] uppercase font-black tracking-wider">
+                                            <th className="px-6 py-4">Cliente</th>
+                                            <th className="px-6 py-4">Serviço Desejado</th>
+                                            <th className="px-6 py-4">Local / Endereço</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Data do Pedido</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {pendingQuotes.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-gray-400">Nenhum pedido pendente</td>
+                                            </tr>
+                                        ) : pendingQuotes.map(req => (
+                                            <tr key={req.id} className="hover:bg-gray-50/80 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs">
+                                                            {req.profiles?.full_name?.charAt(0) || 'C'}
+                                                        </div>
+                                                        <p className="text-sm font-bold text-gray-900">{req.profiles?.full_name || 'Desconhecido'}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm font-bold text-gray-900">{req.service_categories?.name || 'Não especificado'}</p>
+                                                    <p className="text-xs text-gray-500 truncate max-w-[150px]">{req.description}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm text-gray-600 truncate max-w-[200px]">{req.address || 'Sem endereço'}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="bg-amber-100 text-amber-600 px-2 py-1 rounded-md text-[10px] font-black uppercase">
+                                                        Sem Propostas
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">{new Date(req.created_at).toLocaleDateString('pt-BR')}</td>
                                             </tr>
                                         ))}
                                     </tbody>

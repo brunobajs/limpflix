@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Loader2, Users } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Loader2, Users, MapPin } from 'lucide-react'
 
 export default function Login() {
     const [isLogin, setIsLogin] = useState(true)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [fullName, setFullName] = useState('')
+    const [city, setCity] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -51,12 +52,12 @@ export default function Login() {
                     navigate('/')
                 }
             } else {
-                if (!fullName.trim()) {
-                    setError('Preencha seu nome completo.')
+                if (!fullName.trim() || !city.trim()) {
+                    setError('Preencha seu nome completo e cidade.')
                     setLoading(false)
                     return
                 }
-                await signUp(email, password, fullName, referralCode)
+                await signUp(email, password, fullName, city, referralCode)
                 setSuccess('Conta criada com sucesso! Você já pode entrar.')
                 // Redireciona para o dashboard com a flag de boas-vindas
                 navigate('/cliente/dashboard?welcome=true')
@@ -134,6 +135,21 @@ export default function Login() {
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
                                         placeholder="Seu nome completo"
+                                        className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green focus:border-transparent transition-all text-gray-800"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {!isLogin && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        value={city}
+                                        onChange={(e) => setCity(e.target.value)}
+                                        placeholder="Sua cidade (Ex: São Paulo, SP)"
                                         className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green focus:border-transparent transition-all text-gray-800"
                                     />
                                 </div>
