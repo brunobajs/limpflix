@@ -52,7 +52,7 @@ export default function Header() {
                         <Link to="/" className="text-white/80 hover:text-white text-sm">Início</Link>
                         <Link to="/servicos" className="text-white/80 hover:text-white text-sm">Serviços</Link>
                         <Link to="/profissionais" className="text-white/80 hover:text-white text-sm">Profissionais</Link>
-                        <Link to="/perguntas-frequentes" className="text-white/80 hover:text-white text-sm">FAQ</Link>
+                        <Link to="/perguntas-frequentes" className="text-white/80 hover:text-white text-sm">Perguntas Frequentes</Link>
 
                         <Link
                             to="/cadastro-profissional"
@@ -198,7 +198,7 @@ export default function Header() {
                             onClick={() => setMobileOpen(false)}
                             className="block px-4 py-3 text-white font-medium hover:bg-white/10 rounded-xl transition-colors"
                         >
-                            FAQ
+                            Perguntas Frequentes
                         </Link>
 
                         {isAuthenticated ? (

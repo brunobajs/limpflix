@@ -68,7 +68,7 @@ export default function Footer() {
                             <a href="#" className="w-9 h-9 bg-white/10 hover:bg-green/20 rounded-lg flex items-center justify-center transition-all hover:scale-110">
                                 <Facebook className="w-4 h-4 text-white/80" />
                             </a>
-                            <a href="#" className="w-9 h-9 bg-white/10 hover:bg-green/20 rounded-lg flex items-center justify-center transition-all hover:scale-110">
+                            <a href="https://instagram.com/limpflixlimpeza" target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 hover:bg-green/20 rounded-lg flex items-center justify-center transition-all hover:scale-110">
                                 <Instagram className="w-4 h-4 text-white/80" />
                             </a>
                         </div>
