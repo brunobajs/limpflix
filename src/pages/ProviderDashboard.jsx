@@ -8,7 +8,7 @@ import {
     TrendingUp, Clock, DollarSign, Award,
     Loader2, LogOut, ExternalLink, Share2,
     Save, X, MapPin, Phone, Mail, Building2, MessageSquare,
-    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, User, Plus, Shield, FileText,
+    AlertCircle, GraduationCap, Gift, Camera, Image, ChevronRight, ChevronLeft, User, Plus, Shield, FileText,
     BookOpen, Download, ArrowRight, Check, Menu, Bell, FileDown
 } from 'lucide-react'
 import ChatList from '../components/ChatList'
@@ -74,10 +74,29 @@ export default function ProviderDashboard() {
     const [showWelcome, setShowWelcome] = useState(searchParams.get('welcome') === 'true')
     const [copied, setCopied] = useState(false)
     const [renderError, setRenderError] = useState(null)
+    
+    // Calendar State
+    const [currentDate, setCurrentDate] = useState(new Date())
+    const [selectedDate, setSelectedDate] = useState(new Date())
 
     // 2. Notifications Hooks (Depends on state/auth)
     const { unreadCount } = useUnreadCount(user)
     const { count: pendingQuotesCount } = usePendingQuotesCount(user, profile, provider?.id)
+
+    // Calendar Helpers
+    const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+    const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+
+    const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+    const daysInMonth = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
+    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+    const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const blanksArray = Array.from({ length: firstDayOfMonth }, (_, i) => null);
+
+    const getBookingsForDate = (date) => {
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        return bookings.filter(b => b.scheduled_date === dateStr);
+    }
 
     // Log states to help debug
     console.log('ProviderDashboard State:', { 
@@ -932,21 +951,124 @@ export default function ProviderDashboard() {
 
                 {/* Bookings Tab */}
                 {activeTab === 'bookings' && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-fade-in">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4">Gestão de Agendamentos</h2>
-                        {bookings.length === 0 ? (
-                            <div className="text-center py-12">
-                                <Calendar className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                                <h3 className="text-lg font-bold text-gray-700 mb-2">Nenhum agendamento</h3>
-                                <p className="text-gray-500">Quando clientes agendarem serviços, eles aparecerão aqui.</p>
+                    <div className="animate-fade-in grid md:grid-cols-3 gap-6">
+                        <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                            <div className="flex items-center justify-between mb-8">
+                                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                    <Calendar className="w-5 h-5 text-green" />
+                                    Minha Agenda
+                                </h2>
+                                <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl p-1 shadow-sm">
+                                    <button onClick={prevMonth} className="text-gray-400 hover:text-navy hover:bg-white p-1.5 rounded-lg transition-all">
+                                        <ChevronLeft className="w-5 h-5" />
+                                    </button>
+                                    <span className="font-bold text-gray-800 capitalize w-36 text-center text-sm">
+                                        {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                                    </span>
+                                    <button onClick={nextMonth} className="text-gray-400 hover:text-navy hover:bg-white p-1.5 rounded-lg transition-all">
+                                        <ChevronRight className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {bookings.map((booking) => (
-                                    <BookingCard key={booking.id} booking={booking} />
+
+                            <div className="grid grid-cols-7 gap-2 text-center mb-4">
+                                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                                    <div key={day} className="text-xs font-bold text-gray-500 uppercase tracking-wider">{day}</div>
                                 ))}
                             </div>
-                        )}
+                            
+                            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                                {blanksArray.map((_, i) => (
+                                    <div key={`blank-${i}`} className="aspect-square rounded-xl bg-transparent"></div>
+                                ))}
+                                {daysArray.map(day => {
+                                    const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                                    const dayBookings = getBookingsForDate(dateObj);
+                                    const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === currentDate.getMonth() && selectedDate.getFullYear() === currentDate.getFullYear();
+                                    const isToday = day === new Date().getDate() && currentDate.getMonth() === new Date().getMonth() && currentDate.getFullYear() === new Date().getFullYear();
+                                    
+                                    return (
+                                        <button 
+                                            key={day}
+                                            onClick={() => setSelectedDate(dateObj)}
+                                            className={`aspect-square relative p-1.5 sm:p-2 rounded-xl border flex flex-col items-center justify-start transition-all hover:border-green hover:shadow-md ${
+                                                isSelected 
+                                                    ? 'border-green bg-green text-white shadow-lg shadow-green/20 scale-105 z-10' 
+                                                    : isToday 
+                                                        ? 'border-blue-300 bg-blue-50 text-blue-700 font-bold' 
+                                                        : 'border-gray-100 bg-white text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <span className={`text-sm sm:text-base font-bold ${isSelected ? 'text-white' : ''}`}>{day}</span>
+                                            {dayBookings.length > 0 && (
+                                                <div className="flex gap-1 mt-auto mb-1">
+                                                    {dayBookings.slice(0, 3).map((b, i) => (
+                                                        <div key={i} className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : b.status === 'completed' ? 'bg-green' : b.status === 'in_progress' ? 'bg-blue-500' : 'bg-amber-400'}`}></div>
+                                                    ))}
+                                                    {dayBookings.length > 3 && <span className={`text-[9px] font-bold ml-px ${isSelected ? 'text-white' : 'text-gray-500'}`}>+{dayBookings.length - 3}</span>}
+                                                </div>
+                                            )}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                            <div className="mt-6 flex flex-wrap gap-4 pt-4 border-t border-gray-100 text-xs font-medium text-gray-500">
+                                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-green rounded-full"></div>Concluído</div>
+                                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>Em Andamento</div>
+                                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-amber-400 rounded-full"></div>Pendente</div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full md:max-h-[600px]">
+                            <div className="bg-navy p-6 flex-shrink-0 text-white">
+                                <h3 className="text-xl font-bold capitalize mb-1">
+                                    {selectedDate.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'long' })}
+                                </h3>
+                                <p className="text-white/60 text-sm">
+                                    {getBookingsForDate(selectedDate).length} serviço(s) agendado(s) neste dia
+                                </p>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                                {getBookingsForDate(selectedDate).length === 0 ? (
+                                    <div className="text-center py-10 flex flex-col items-center">
+                                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 border border-gray-100">
+                                            <Calendar className="w-8 h-8 text-gray-300" />
+                                        </div>
+                                        <h4 className="font-bold text-gray-700">Agenda Livre</h4>
+                                        <p className="text-sm text-gray-400 mt-1">Nenhum serviço confirmado para esta data.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {getBookingsForDate(selectedDate).map(booking => (
+                                            <BookingCard key={booking.id} booking={booking} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-white p-5 border-t border-gray-100 flex-shrink-0">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Orçamentos pendentes de data</p>
+                                <div className="space-y-2">
+                                    {bookings.filter(b => !b.scheduled_date).length === 0 ? (
+                                        <p className="text-xs text-gray-400 flex items-center gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green" /> 
+                                            Tudo organizado!
+                                        </p>
+                                    ) : (
+                                        bookings.filter(b => !b.scheduled_date).slice(0, 3).map(booking => (
+                                            <div key={booking.id} className="text-xs p-3 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between group hover:border-amber-200 hover:bg-amber-50/30 transition-all cursor-pointer">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                                    <span className="font-bold text-gray-700 truncate">{booking.client_name}</span>
+                                                </div>
+                                                <span className="text-amber-600 font-bold bg-amber-100 px-2 rounded-full py-0.5 whitespace-nowrap ml-2">Definir pelo Chat</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
