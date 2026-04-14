@@ -15,11 +15,24 @@ export default function ClientQuotesTab({ clientId, onOpenChat, onHire }) {
         try {
             const { data, error } = await supabase
                 .from("service_quotes")
-                .select("*, provider:service_providers(id, trade_name, responsible_name, profile_image)")
+                .select("*, provider:service_providers(id, trade_name, responsible_name, profile_image), chat_conversations(quote_request_id)")
                 .eq("client_id", clientId)
                 .order("created_at", { ascending: false })
             if (error) throw error
-            setQuotes(data || [])
+
+            const allQuotes = data || []
+            const pendingQuotes = allQuotes.filter(q => q.status === "pending")
+            const groupedPending = {}
+            pendingQuotes.forEach(q => {
+               const reqId = q.chat_conversations?.quote_request_id || q.conversation_id
+               if (!groupedPending[reqId] || q.amount < groupedPending[reqId].amount) {
+                   groupedPending[reqId] = q
+               }
+            })
+            const cheapestPendingIds = new Set(Object.values(groupedPending).map(q => q.id))
+
+            const visibleQuotes = allQuotes.filter(q => q.status !== "pending" || cheapestPendingIds.has(q.id))
+            setQuotes(visibleQuotes)
         } catch (err) {
             console.error(err)
         } finally {

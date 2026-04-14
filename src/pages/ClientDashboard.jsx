@@ -87,11 +87,19 @@ export default function ClientDashboard() {
         try {
             const { data } = await supabase
                 .from('service_quotes')
-                .select('*, provider:service_providers(trade_name, responsible_name, profile_image)')
+                .select('*, provider:service_providers(trade_name, responsible_name, profile_image), chat_conversations(quote_request_id)')
                 .eq('client_id', userId)
                 .eq('status', 'pending')
                 .order('created_at', { ascending: false })
-            setPendingQuotes(data || [])
+            
+            const groupedPending = {}
+            ;(data || []).forEach(q => {
+               const reqId = q.chat_conversations?.quote_request_id || q.conversation_id
+               if (!groupedPending[reqId] || q.amount < groupedPending[reqId].amount) {
+                   groupedPending[reqId] = q
+               }
+            })
+            setPendingQuotes(Object.values(groupedPending))
         } catch (e) {}
     }
 

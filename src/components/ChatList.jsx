@@ -32,7 +32,7 @@ export default function ChatList({ onSelectConversation, selectedId }) {
 
             let query = supabase
                 .from('chat_conversations')
-                .select('*, service_providers (id, trade_name, responsible_name, profile_image, user_id)')
+                .select('*, service_providers (id, trade_name, responsible_name, profile_image, user_id), service_quotes(status)')
                 .order('last_message_at', { ascending: false })
 
             if (providerData) {
@@ -80,7 +80,22 @@ export default function ChatList({ onSelectConversation, selectedId }) {
 
     const filteredConversations = conversations.filter(conv => {
         const name = getDisplayName(conv)
-        return name.toLowerCase().includes(searchTerm.toLowerCase())
+        if (!name.toLowerCase().includes(searchTerm.toLowerCase())) return false
+
+        const isUserProvider = providerId && conv.provider_id === providerId
+        if (isUserProvider) return true
+
+        const quotes = Array.isArray(conv.service_quotes) ? conv.service_quotes : (conv.service_quotes ? [conv.service_quotes] : [])
+        const hasAcceptedQuote = quotes.some(q => q.status === 'accepted' || q.status === 'paid')
+        
+        const isAutomatedMessage = !conv.last_message 
+            || conv.last_message === 'Orçamento solicitado' 
+            || conv.last_message.includes('Orçamento enviado')
+            || conv.last_message.includes('Orçamento aprovado')
+
+        if (hasAcceptedQuote || !isAutomatedMessage) return true
+        
+        return false
     })
 
     return (
