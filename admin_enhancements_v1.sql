@@ -25,6 +25,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ===============================================
 -- 3. RE-CRIAR RPC get_admin_clients PARA INCLUIR CITY
 -- ===============================================
+DROP FUNCTION IF EXISTS get_admin_clients();
+
 CREATE OR REPLACE FUNCTION get_admin_clients()
 RETURNS TABLE (
     id UUID,

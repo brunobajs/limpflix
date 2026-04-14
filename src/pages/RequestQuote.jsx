@@ -186,7 +186,6 @@ export default function RequestQuote() {
             }
 
             // 4. Create Chats with the Top 3
-            const user = (await supabase.auth.getUser()).data.user
             const selectedIds = top3.map(p => p.id)
             
             // Link the selected providers to the request
