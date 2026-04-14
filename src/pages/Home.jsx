@@ -283,9 +283,9 @@ export default function Home() {
 
                         {/* Image Column */}
                         <div className="relative hidden lg:block">
-                            <div className="relative z-10 w-full max-w-[500px] ml-auto lg:-mt-36 h-[510px] overflow-hidden">
+                            <div className="relative z-10 w-full max-w-[500px] ml-auto lg:-mt-44 h-[580px] overflow-hidden">
                                 <div className="absolute inset-0 bg-green/5 blur-3xl"></div>
-                                <div className="relative h-[850px] -mt-10 scale-105 transition-transform duration-700">
+                                <div className="relative h-[850px] -mt-20 scale-125 transition-transform duration-700 origin-top">
                                     <img
                                         src="/assets/professional.png"
                                         alt="Boas-vindas LimpFlix"
