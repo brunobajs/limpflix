@@ -6,6 +6,7 @@ import {
     Search, Calendar, Star, ArrowRight, CheckCircle2,
     Users, Shield, MapPin, ChevronRight
 } from 'lucide-react'
+import FAQSection from '../components/FAQSection'
 
 const SERVICES = [
     {
@@ -376,6 +377,8 @@ export default function Home() {
                     </div>
                 </div>
             </section>
+            
+            <FAQSection />
 
             {/* Why LimpFlix */}
             <section className="py-16 md:py-24 bg-gradient-to-br from-navy to-navy-light text-white">

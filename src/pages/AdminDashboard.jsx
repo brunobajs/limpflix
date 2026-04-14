@@ -7,7 +7,8 @@ import {
     TrendingUp, Calendar, Search, Filter,
     Download, ArrowUpRight, Loader2, PieChart,
     BarChart3, Settings, Star, CheckCircle2,
-    MessageSquare, FileText, Wallet
+    MessageSquare, FileText, Wallet, Shield,
+    Trash2, AlertTriangle
 } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -137,6 +138,24 @@ export default function AdminDashboard() {
             console.error('Error loading admin data:', err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function handleDeleteProvider(providerId, providerName) {
+        if (!window.confirm(`Tem certeza que deseja excluir permanentemente o prestador "${providerName}"? Esta ação removerá todos os agendamentos, orçamentos e conversas associadas.`)) {
+            return
+        }
+
+        try {
+            const { error } = await supabase.rpc('delete_provider_v1', { p_provider_id: providerId })
+            
+            if (error) throw error
+
+            alert('Prestador excluído com sucesso!')
+            loadAdminData() // Recarregar dados
+        } catch (err) {
+            console.error('Erro ao excluir prestador:', err)
+            alert('Erro ao excluir prestador. Verifique se a função delete_provider_v1 existe no banco de dados.')
         }
     }
 
@@ -328,6 +347,7 @@ export default function AdminDashboard() {
                                             <th className="px-6 py-4">Avaliação</th>
                                             <th className="px-6 py-4">Saldo Pendente</th>
                                             <th className="px-6 py-4">Saldo Disponível</th>
+                                            <th className="px-6 py-4 text-right">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
@@ -362,6 +382,15 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4 text-sm font-bold text-green">
                                                     R$ {p.wallet_balance?.toLocaleString() || '0,00'}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button 
+                                                        onClick={() => handleDeleteProvider(p.id, p.trade_name || p.responsible_name)}
+                                                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Excluir Prestador"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}

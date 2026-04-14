@@ -190,6 +190,16 @@ export default function Login() {
                                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                 </button>
                             </div>
+                            {isLogin && (
+                                <div className="text-right">
+                                    <Link 
+                                        to="/esqueci-senha" 
+                                        className="text-xs text-navy hover:text-green font-medium transition-colors"
+                                    >
+                                        Esqueci minha senha
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                         <button
                             type="submit"

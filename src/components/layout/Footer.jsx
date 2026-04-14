@@ -39,6 +39,11 @@ export default function Footer() {
                                     Seja um Profissional
                                 </Link>
                             </li>
+                            <li>
+                                <Link to="/perguntas-frequentes" className="text-white/60 hover:text-green transition-colors text-sm">
+                                    Perguntas Frequentes
+                                </Link>
+                            </li>
                         </ul>
                     </div>
 

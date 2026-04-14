@@ -110,6 +110,14 @@ export default function AdminLogin() {
                                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                 </button>
                             </div>
+                            <div className="text-right mt-1">
+                                <Link 
+                                    to="/esqueci-senha" 
+                                    className="text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors"
+                                >
+                                    Esqueci minha senha
+                                </Link>
+                            </div>
                         </div>
                         <button
                             type="submit"

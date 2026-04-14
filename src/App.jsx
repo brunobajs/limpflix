@@ -18,6 +18,9 @@ import AdminLogin from './pages/AdminLogin'
 import Terms from './pages/Terms'
 import ClientQuotes from './pages/ClientQuotes'
 import Privacy from './pages/Privacy'
+import FAQ from './pages/FAQ'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import InstallPrompt from './components/InstallPrompt'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
@@ -110,6 +113,9 @@ function App() {
                     <Route path="/dashboard" element={<ProviderDashboard />} />
                     
                     <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/esqueci-senha" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/perguntas-frequentes" element={<Layout><FAQ /></Layout>} />
                     <Route path="/admin" element={
                         <AdminRoute>
                             <AdminDashboard />
