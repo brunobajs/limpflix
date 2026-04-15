@@ -20,6 +20,8 @@ export default function AdminDashboard() {
         totalClients: 0,
         totalServices: 0,
         totalRevenue: 0,
+        totalAccesses: 0,
+        recentAccesses: 0,
         recentBookings: [],
         financials: {
             providerShare: 0,
@@ -74,11 +76,20 @@ export default function AdminDashboard() {
             const referralShare = completedBookings.reduce((acc, current) => acc + (Number(current.amount_referral) || 0), 0)
             const escrowFunds = escrowBookings.reduce((acc, current) => acc + (Number(current.amount_provider) || 0), 0)
 
+            // Access Stats
+            const { count: totalAccessCount } = await supabase.from('platform_access_logs').select('*', { count: 'exact', head: true })
+            const { count: dailyAccessCount } = await supabase
+                .from('platform_access_logs')
+                .select('*', { count: 'exact', head: true })
+                .gte('accessed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+
             setStats({
                 totalProviders: providersCount || 0,
                 totalClients: clientsCount || 0,
                 totalServices,
                 totalRevenue,
+                totalAccesses: totalAccessCount || 0,
+                recentAccesses: dailyAccessCount || 0,
                 financials: {
                     platformShare,
                     providerShare,
@@ -264,12 +275,13 @@ export default function AdminDashboard() {
 
                 <div className="p-8 space-y-8 animate-fade-in">
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                         {[
                             { label: 'Prestadores Totais', value: stats.totalProviders, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
                             { label: 'Clientes Ativos', value: stats.totalClients, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
                             { label: 'Serviços (Garantia)', value: `R$ ${stats.financials.escrowFunds.toLocaleString()}`, icon: Shield, color: 'text-orange-600', bg: 'bg-orange-50' },
                             { label: 'Faturamento Total', value: `R$ ${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
+                            { label: 'Acessos (24h / Total)', value: `${stats.recentAccesses} / ${stats.totalAccesses}`, icon: LayoutDashboard, color: 'text-indigo-600', bg: 'bg-indigo-50' },
                         ].map((stat, i) => (
                             <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                 <div className={`${stat.bg} w-12 h-12 rounded-xl flex items-center justify-center mb-4`}>

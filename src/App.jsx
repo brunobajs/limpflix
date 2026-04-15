@@ -85,6 +85,30 @@ function Layout({ children }) {
 }
 
 function App() {
+    useEffect(() => {
+        // Rastreamento de Acesso à Plataforma
+        const trackAccess = async () => {
+            try {
+                // Evita múltiplos registros na mesma sessão
+                const sessionTracked = sessionStorage.getItem('limpflix_tracked')
+                if (sessionTracked) return
+
+                await supabase.from('platform_access_logs').insert([{
+                    path: window.location.pathname,
+                    user_agent: navigator.userAgent,
+                    referrer: document.referrer || 'direct',
+                    session_id: crypto.randomUUID()
+                }])
+
+                sessionStorage.setItem('limpflix_tracked', 'true')
+            } catch (err) {
+                console.warn('Erro ao registrar acesso:', err)
+            }
+        }
+
+        trackAccess()
+    }, [])
+
     return (
         <AuthProvider>
             <Router>
